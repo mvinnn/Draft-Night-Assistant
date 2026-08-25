@@ -1,0 +1,896 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bozo Club Draft Assistant</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --surface-1: #ffffff;
+    --surface-2: #eef0f3;
+    --border: #dde1e6;
+    --text: #1a1d21;
+    --text-secondary: #5b6270;
+    --text-muted: #8a919e;
+    --radius: 10px;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+
+    --accent: #3b6fe0;
+    --bg-accent: #e8eefc;
+    --text-accent: #3b6fe0;
+
+    --success: #1c8a4b;
+    --bg-success: #e5f6ec;
+    --text-success: #1c8a4b;
+
+    --warning: #b06a00;
+    --bg-warning: #fdf1de;
+    --text-warning: #b06a00;
+
+    --danger: #c8372f;
+    --bg-danger: #fbe9e8;
+    --text-danger: #c8372f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --surface-1: #1c1f24;
+      --surface-2: #24272d;
+      --border: #32363d;
+      --text: #eceef1;
+      --text-secondary: #a6acb8;
+      --text-muted: #767c88;
+
+      --accent: #6d93ee;
+      --bg-accent: #22304f;
+      --text-accent: #8fb0f5;
+
+      --success: #3fbd77;
+      --bg-success: #163524;
+      --text-success: #5fd394;
+
+      --warning: #e0a53d;
+      --bg-warning: #3a2c10;
+      --text-warning: #f0bb5e;
+
+      --danger: #e46861;
+      --bg-danger: #3a1917;
+      --text-danger: #f0847d;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  #app {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem 4rem;
+  }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 2px; }
+  h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
+  .subtitle { color: var(--text-secondary); font-size: 13px; margin: 0 0 1.5rem; }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .card-flat {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    margin-bottom: 1.25rem;
+  }
+  .label {
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+  }
+
+  input[type=text], input[type=number] {
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: inherit;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+  button:hover { filter: brightness(1.08); }
+  button.secondary {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  button.danger-ghost {
+    background: transparent;
+    color: var(--text-danger);
+    border: 1px solid var(--border);
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+
+  .row { display: flex; gap: 8px; align-items: center; }
+  .row.wrap { flex-wrap: wrap; }
+  .grow { flex: 1; }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-bottom: 1.25rem; }
+  .stat { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+  .stat .label { margin-bottom: 4px; }
+  .stat .value { font-size: 22px; font-weight: 600; }
+
+  .pill {
+    font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+    background: var(--bg-accent); color: var(--text-accent); display: inline-block;
+  }
+
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; }
+
+  .chip {
+    font-size: 12.5px; padding: 4px 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px;
+  }
+  .chip.target { background: var(--bg-success); color: var(--text-success); }
+  .chip.avoid { background: var(--bg-danger); color: var(--text-danger); }
+
+  .player-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px;
+  }
+  .player-row .rank { font-size: 12px; color: var(--text-muted); width: 26px; }
+  .pos-badge {
+    font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px;
+    width: 28px; text-align: center; flex-shrink: 0;
+  }
+  .pos-QB { background: var(--bg-accent); color: var(--text-accent); }
+  .pos-RB { background: var(--bg-success); color: var(--text-success); }
+  .pos-WR { background: var(--bg-warning); color: var(--text-warning); }
+  .pos-TE { background: var(--bg-danger); color: var(--text-danger); }
+  .player-name { font-size: 13.5px; flex: 1; }
+  .player-row button { font-size: 11.5px; padding: 4px 9px; }
+  .flag-icon { font-size: 13px; }
+
+  .muted-note { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; }
+  .error-text { font-size: 13px; color: var(--text-danger); margin: 8px 0 0; }
+  .status-text { font-size: 13px; color: var(--text-muted); margin: 8px 0 0; }
+
+  .field-inline { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); }
+  .field-inline input { width: 56px; }
+
+  a { color: var(--text-accent); }
+  code { font-family: var(--font-mono); background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
+
+  #best-available-list { display: flex; flex-direction: column; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+// ---------- Embedded knowledge base (from Joel Smyth's 2026 Draft Guide) ----------
+const RANKINGS = [
+  [1,"Jahmyr Gibbs","RB"],[2,"Bijan Robinson","RB"],[3,"Ja'Marr Chase","WR"],
+  [4,"Puka Nacua","WR"],[5,"Christian McCaffrey","RB"],[6,"Amon-Ra St. Brown","WR"],
+  [7,"Jonathan Taylor","RB"],[8,"Jaxon Smith-Njigba","WR"],[9,"James Cook III","RB"],
+  [10,"CeeDee Lamb","WR"],[11,"Omarion Hampton","RB"],[12,"Ashton Jeanty","RB"],
+  [13,"Chase Brown","RB"],[14,"Kenneth Walker III","RB"],[15,"Justin Jefferson","WR"],
+  [16,"De'Von Achane","RB"],[17,"Saquon Barkley","RB"],[18,"Brock Bowers","TE"],
+  [19,"Drake London","WR"],[20,"A.J. Brown","WR"],[21,"Derrick Henry","RB"],
+  [22,"George Pickens","WR"],[23,"Trey McBride","TE"],[24,"Nico Collins","WR"],
+  [25,"Jeremiyah Love","RB"],[26,"Malik Nabers","WR"],[27,"Rashee Rice","WR"],
+  [28,"DeVonta Smith","WR"],[29,"Chris Olave","WR"],[30,"Josh Allen","QB"],
+  [31,"Breece Hall","RB"],[32,"Tee Higgins","WR"],[33,"Javonte Williams","RB"],
+  [34,"Kyren Williams","RB"],[35,"Josh Jacobs","RB"],[36,"Jaylen Waddle","WR"],
+  [37,"Zay Flowers","WR"],[38,"Tetairoa McMillan","WR"],[39,"Emeka Egbuka","WR"],
+  [40,"Colston Loveland","TE"],[41,"Garrett Wilson","WR"],[42,"Luther Burden III","WR"],
+  [43,"Ladd McConkey","WR"],[44,"Tyler Warren","TE"],[45,"Travis Etienne Jr.","RB"],
+  [46,"Cam Skattebo","RB"],[47,"DJ Moore","WR"],[48,"Bucky Irving","RB"],
+  [49,"David Montgomery","RB"],[50,"Rome Odunze","WR"],[51,"Lamar Jackson","QB"],
+  [52,"Quinshon Judkins","RB"],[53,"D'Andre Swift","RB"],[54,"Terry McLaurin","WR"],
+  [55,"Bhayshul Tuten","RB"],[56,"TreVeyon Henderson","RB"],[57,"Davante Adams","WR"],
+  [58,"Drake Maye","QB"],[59,"Jayden Daniels","QB"],[60,"Christian Watson","WR"],
+  [61,"Joe Burrow","QB"],[62,"Parker Washington","WR"],[63,"Mike Evans","WR"],
+  [64,"Jameson Williams","WR"],[65,"Harold Fannin Jr.","TE"],[66,"Sam LaPorta","TE"],
+  [67,"Tucker Kraft","TE"],[68,"Jalen Hurts","QB"],[69,"Brian Thomas Jr.","WR"],
+  [70,"Marvin Harrison Jr.","WR"],[71,"Caleb Williams","QB"],[72,"Jaylen Warren","RB"],
+  [73,"Jadarian Price","RB"],[74,"Rico Dowdle","RB"],[75,"Rhamondre Stevenson","RB"],
+  [76,"Trevor Lawrence","QB"],[77,"Justin Herbert","QB"],[78,"Carnell Tate","WR"],
+  [79,"Jaxson Dart","QB"],[80,"Kyle Pitts Sr.","TE"],[81,"Jonathon Brooks","RB"],
+  [82,"RJ Harvey","RB"],[83,"Chuba Hubbard","RB"],[84,"Brock Purdy","QB"],
+  [85,"Dak Prescott","QB"],[86,"DK Metcalf","WR"],[87,"Michael Wilson","WR"],
+  [88,"Tony Pollard","RB"],[89,"Kyle Monangai","RB"],[90,"Blake Corum","RB"],
+  [91,"Chris Godwin Jr.","WR"],[92,"Josh Downs","WR"],[93,"George Kittle","TE"],
+  [94,"Alec Pierce","WR"],[95,"Bo Nix","QB"],[96,"Courtland Sutton","WR"],
+  [97,"Quentin Johnston","WR"],[98,"Rachaad White","RB"],[99,"Patrick Mahomes II","QB"],
+  [100,"Jayden Reed","WR"],[101,"Matthew Stafford","QB"],[102,"Kyler Murray","QB"],
+  [103,"Jordan Mason","RB"],[104,"Jared Goff","QB"],[105,"J.K. Dobbins","RB"],
+  [106,"Jordyn Tyson","WR"],[107,"Wan'Dale Robinson","WR"],[108,"Michael Pittman Jr.","WR"],
+  [109,"Stefon Diggs","WR"],[110,"Malik Willis","QB"],[111,"Dalton Kincaid","TE"],
+  [112,"Makai Lemon","WR"],[113,"Kenny Gainwell","RB"],[114,"Jordan Addison","WR"],
+  [115,"Deebo Samuel","WR"],[116,"Jacory Croskey-Merritt","RB"],[117,"Jakobi Meyers","WR"],
+  [118,"Dallas Goedert","TE"],[119,"Mark Andrews","TE"],[120,"Tyler Shough","QB"],
+  [121,"Zach Charbonnet","RB"],[122,"Chris Rodriguez Jr.","RB"],[123,"Romeo Doubs","WR"],
+  [124,"De'Zhaun Stribling","WR"],[125,"Tyjae Spears","RB"],[126,"Isaiah Likely","TE"],
+  [127,"Matthew Golden","WR"],[128,"Baker Mayfield","QB"],[129,"Aaron Jones Sr.","RB"],
+  [130,"Keaton Mitchell","RB"],[131,"Jake Ferguson","TE"],[132,"Jordan Love","QB"],
+  [133,"Travis Kelce","TE"],[134,"Tank Bigsby","RB"],[135,"Tyler Allgeier","RB"],
+  [136,"Xavier Worthy","WR"],[137,"Alvin Kamara","RB"],[138,"Isiah Pacheco","RB"],
+  [139,"KC Concepcion","WR"],[140,"Jalen Coker","WR"],[141,"Ray Davis","RB"],
+  [142,"Jonah Coleman","RB"],[143,"Marshawn Lloyd","RB"],[144,"Tyrone Tracy Jr.","RB"],
+  [145,"Cam Ward","QB"],[146,"Sam Darnold","QB"],[147,"Jayden Higgins","WR"],
+  [148,"Woody Marks","RB"],[149,"Khalil Shakir","WR"],[150,"Rashid Shaheed","WR"],
+];
+
+const FLAGS = {
+  "Omarion Hampton": {tag:"target", note:"McDaniel hit on 3 straight fantasy RB1s", risk:5},
+  "Ashton Jeanty": {tag:"target", note:"AYAC jumps 17th→1st adjusted for situation; new OL+HC", risk:6},
+  "Chase Brown": {tag:"target", note:"Zac Taylor produces an RB1 every year he's had the starter"},
+  "Kenneth Walker III": {tag:"target", note:"Best situation of his career, now on KC", risk:6},
+  "Bhayshul Tuten": {tag:"target"}, "TreVeyon Henderson": {tag:"target"},
+  "Jonathon Brooks": {tag:"target", note:"Canales' RBs outperform draft capital every year", risk:10},
+  "Terry McLaurin": {tag:"target"}, "Parker Washington": {tag:"target", note:"454 rec yds in JAX's final 4 games"},
+  "Colston Loveland": {tag:"target"}, "Tyler Warren": {tag:"target", note:"Target share jumps 21%→30% without Pittman — Pittman's gone", risk:6},
+  "Cam Skattebo": {tag:"target"}, "Rome Odunze": {tag:"target"}, "Caleb Williams": {tag:"target"},
+  "A.J. Brown": {tag:"target", note:"Elite target efficiency even in a bad scheme fit", risk:8},
+  "Luther Burden III": {tag:"target", note:"8th in rookie fantasy pts/snap; Moore's exit clears target share", risk:6},
+  "Marvin Harrison Jr.": {tag:"target", risk:7},
+  "Brock Bowers": {tag:"target", note:"Best rookie TE ever statistically; TE4 through chaos", risk:5},
+  "Harold Fannin Jr.": {tag:"target", note:"Higher tgt/route than McBride in 2025; Njoku gone", risk:6},
+  "Dalton Kincaid": {tag:"target", note:"#1 TE in nearly every efficiency stat, capped by usage not talent"},
+  "Kyler Murray": {tag:"target", note:"QB5 in PPG 2019-2024, ADP has him at QB14-17"},
+  "Malik Willis": {tag:"target", note:"1st in fantasy pts/snap among QBs in 2025"},
+  "Ray Davis": {tag:"target", note:"Joel's explicit Round 15 value pick, cemented handcuff"},
+
+  "Justin Jefferson": {tag:"pass"}, "De'Von Achane": {tag:"pass"}, "Kyren Williams": {tag:"pass"},
+  "Josh Jacobs": {tag:"pass"}, "Quinshon Judkins": {tag:"pass"}, "Jacory Croskey-Merritt": {tag:"pass"},
+  "Michael Pittman Jr.": {tag:"pass"}, "Jakobi Meyers": {tag:"pass"}, "Rachaad White": {tag:"pass"},
+
+  "Trey McBride": {tag:"avoid", note:"Reach at current price per Joel"},
+  "Tony Pollard": {tag:"avoid"}, "Aaron Jones Sr.": {tag:"avoid"},
+  "Travis Kelce": {tag:"avoid", note:"Age 37, 3 yrs declining PPG, 28th in TE red-zone share", risk:9},
+  "Courtland Sutton": {tag:"avoid"}, "Khalil Shakir": {tag:"avoid"},
+};
+
+const ROUND_PLAN = [
+  {r:1, pos:"RB", note:"Take conviction, not “value” — PPG gap 9-12 vs top-8 is only 0.5 since 2019"},
+  {r:2, pos:"RB / BPA", note:"Right after your own pick — full read on who's gone"},
+  {r:3, pos:"WR", note:"Long wait since 2.13 — re-check the board fresh"},
+  {r:4, pos:"BPA", note:"Back-to-back with Rd 3 — you likely get both again"},
+  {r:5, pos:"WR", note:"Waddle/Flowers/McMillan/Egbuka tier"},
+  {r:6, pos:"BPA", note:"Steepest talent drop-off remaining"},
+  {r:7, pos:"BPA", note:"Steepest talent drop-off remaining"},
+  {r:8, pos:"QB", note:"Target ADP QB7-11 — going later than usual this year"},
+  {r:9, pos:"Upside WR", note:"Rookie WRs, situational winners"},
+  {r:10, pos:"TE (value)", note:"Best value TE if you punted — Kincaid/Goedert/Fannin tier"},
+  {r:11, pos:"Handcuff", note:"Handcuff your own Rd 1-2 RB if startable"},
+  {r:12, pos:"QB (upside)", note:"Rushing QBs hit 63% vs 31% for pocket passers at this tier"},
+  {r:13, pos:"Deep sleeper", note:"Your call — check flagged targets still on board"},
+  {r:14, pos:"DST", note:""},
+  {r:15, pos:"Stash/Handcuff", note:"No kicker in this league — use it as a real roster spot"},
+];
+
+const DEFAULT_DRAFT_ID = "1397995205646409728";
+
+// Tier boundaries are within-position (a player's rank among their own
+// position), not their overall 1-150 rank.
+function assignTiers(rankings) {
+  const posRanks = {};
+  return rankings.map(([rank, name, pos]) => {
+    posRanks[pos] = (posRanks[pos] || 0) + 1;
+    const posRank = posRanks[pos];
+    let tier;
+    if (pos === "RB") tier = posRank <= 9 ? 1 : posRank <= 16 ? 2 : posRank <= 25 ? 3 : posRank <= 35 ? 4 : 5;
+    else if (pos === "WR") tier = posRank <= 10 ? 1 : posRank <= 20 ? 2 : posRank <= 32 ? 3 : posRank <= 43 ? 4 : 5;
+    else if (pos === "TE") tier = posRank === 1 ? 1 : posRank <= 4 ? 2 : posRank <= 7 ? 3 : 4;
+    else if (pos === "QB") tier = posRank <= 2 ? 1 : 2;
+    else tier = 1;
+    return [rank, name, pos, tier];
+  });
+}
+const RANKINGS_TIERED = assignTiers(RANKINGS);
+
+// ---------- State ----------
+const state = {
+  draftedNames: new Set(), // normalized-name keys, see normalizeName()
+  draftId: DEFAULT_DRAFT_ID,
+  liveStatus: "idle", // idle | connecting | live | error
+  errorMsg: "",
+  lastPickCount: 0,
+  manualInput: "",
+  currentRound: 1,
+  yourSlot: 12,
+  teams: 12,
+  rounds: 15,
+  draftStatus: null, // pre_draft | drafting | complete
+  pollHandle: null,
+  usernameInput: "",
+  slotLookupMsg: "",
+  yourRoster: [], // {name, pos} the user has actually drafted, from live sync
+  pickHistory: [], // ordered {pickNo, name, pos} for all picks, for run detection
+  alerts: [], // {id, type: "tier-break"|"run"|"roster", text, pickNo}, newest first
+  _slotToRosterId: null,
+  _lastRunAlertKey: null,
+};
+
+function pickNoForRound(round, slot, teams) {
+  const forward = (round % 2 === 1);
+  const posInRound = forward ? slot : (teams - slot + 1);
+  return (round - 1) * teams + posInRound;
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+
+// Sleeper's metadata.last_name for suffixed players often drops the suffix
+// (e.g. "Cook" not "Cook III"), so raw-string matching against RANKINGS
+// ("James Cook III") silently fails. Compare on a normalized key instead.
+function normalizeName(name) {
+  return name
+    .toLowerCase()
+    .replace(/\b(jr|sr|ii|iii|iv|v)\.?\b/g, "")
+    .replace(/[.']/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pushAlert(type, text) {
+  state.alerts.unshift({id: Date.now() + Math.random(), type, text, pickNo: state.lastPickCount});
+  state.alerts = state.alerts.slice(0, 10);
+}
+
+function detectTierBreaks(previousDrafted, currentDrafted) {
+  const newlyDrafted = [...currentDrafted].filter(k => !previousDrafted.has(k));
+  // Multiple picks can land in one poll (or on first connect to a draft
+  // already in progress). Every player in a tier that just emptied would
+  // independently satisfy "remainingInTier === 0" against the final state,
+  // so dedupe to one alert per (pos, tier) — keeping the chronologically
+  // last pick, since newlyDrafted iterates in pick order.
+  const brokenTiers = new Map();
+  newlyDrafted.forEach(key => {
+    const entry = RANKINGS_TIERED.find(([, n]) => normalizeName(n) === key);
+    if (!entry) return;
+    const [, name, pos, tier] = entry;
+    const remainingInTier = RANKINGS_TIERED.filter(([, n, p, t]) =>
+      p === pos && t === tier && !currentDrafted.has(normalizeName(n))
+    );
+    if (remainingInTier.length === 0) {
+      brokenTiers.set(`${pos}-${tier}`, {name, pos, tier});
+    }
+  });
+  brokenTiers.forEach(({name, pos, tier}) => {
+    const nextTier = RANKINGS_TIERED.filter(([, n, p, t]) =>
+      p === pos && t === tier + 1 && !currentDrafted.has(normalizeName(n))
+    ).slice(0, 3);
+    const nextNames = nextTier.map(([, n]) => n).join(", ") || "none ranked";
+    pushAlert("tier-break", `Last ${pos} in tier ${tier} is gone (${name}). Next tier: ${nextNames}.`);
+  });
+}
+
+function detectRuns() {
+  const recent = state.pickHistory.slice(-6);
+  if (recent.length < 6) return;
+  const counts = {};
+  recent.forEach(p => { counts[p.pos] = (counts[p.pos] || 0) + 1; });
+  const [runPos, runCount] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
+  if (runCount >= 3) {
+    const alertKey = `run-${runPos}-${state.lastPickCount}`;
+    if (state._lastRunAlertKey === alertKey) return;
+    state._lastRunAlertKey = alertKey;
+    const tierLeft = RANKINGS_TIERED.filter(([, n, p]) => p === runPos && !state.draftedNames.has(normalizeName(n))).length;
+    pushAlert("run", `Run on ${runPos} — ${runCount} of last 6 picks. ${tierLeft} ${runPos}s left ranked.`);
+  }
+}
+
+function checkRosterWarnings() {
+  const warnings = [];
+  const highRiskCount = state.yourRoster.filter(p => {
+    const f = FLAGS[p.name];
+    return f && typeof f.risk === "number" && f.risk >= 8;
+  }).length;
+  if (highRiskCount >= 3) {
+    warnings.push(`You have ${highRiskCount} high-risk (8+/10) players rostered — consider balancing with a safer pick.`);
+  }
+  const posCounts = {};
+  state.yourRoster.forEach(p => { posCounts[p.pos] = (posCounts[p.pos] || 0) + 1; });
+  if (state.currentRound >= 8 && !posCounts["QB"]) {
+    warnings.push("No QB rostered yet and it's Round 8+ — main target window (QB7-11 ADP) is closing.");
+  }
+  if (state.currentRound >= 10 && !posCounts["TE"]) {
+    warnings.push("No TE rostered yet and it's Round 10+ — check the value tier before it's gone.");
+  }
+  return warnings;
+}
+
+// ---------- Data fetching ----------
+async function fetchDraftMeta(id) {
+  try {
+    const res = await fetch(`https://api.sleeper.app/v1/draft/${id}`);
+    if (!res.ok) return;
+    const meta = await res.json();
+    if (meta && meta.settings) {
+      if (meta.settings.teams) state.teams = meta.settings.teams;
+      if (meta.settings.rounds) state.rounds = meta.settings.rounds;
+    }
+    if (meta && meta.status) state.draftStatus = meta.status;
+    state._draftOrder = meta.draft_order || null;
+    state._slotToRosterId = meta.slot_to_roster_id || null;
+  } catch (e) { /* non-fatal, keep manual values */ }
+}
+
+async function fetchPicks(id) {
+  try {
+    state.liveStatus = "connecting";
+    render();
+    await fetchDraftMeta(id);
+    const res = await fetch(`https://api.sleeper.app/v1/draft/${id}/picks`);
+    if (!res.ok) throw new Error("Draft not found or not accessible");
+    const picks = await res.json();
+
+    const previousDrafted = state.draftedNames;
+    const names = new Set();
+    const pickHistory = [];
+    const yourRosterId = state._slotToRosterId ? state._slotToRosterId[String(state.yourSlot)] : null;
+    const yourRoster = [];
+
+    picks.forEach(p => {
+      const meta = p.metadata;
+      if (!meta || !meta.first_name || !meta.last_name) return; // autopicked/on-the-clock picks can lack metadata
+      const full = `${meta.first_name} ${meta.last_name}`.trim();
+      const key = normalizeName(full);
+      names.add(key);
+      const pos = meta.position || (RANKINGS_TIERED.find(([, n]) => normalizeName(n) === key) || [])[2];
+      pickHistory.push({pickNo: p.pick_no, name: full, pos});
+      if (yourRosterId != null && p.roster_id === yourRosterId) {
+        yourRoster.push({name: full, pos});
+      }
+      const inRankings = RANKINGS.some(([, n]) => normalizeName(n) === key);
+      if (!inRankings && meta.position !== "DEF" && meta.position !== "K") {
+        console.warn("Drafted player not in RANKINGS (may be past rank 150):", full);
+      }
+    });
+
+    state.draftedNames = names;
+    state.pickHistory = pickHistory;
+    state.yourRoster = yourRoster;
+    state.lastPickCount = picks.length;
+    const nextPickNo = picks.length + 1;
+    const inferredRound = Math.ceil(nextPickNo / state.teams);
+    state.currentRound = Math.max(1, Math.min(state.rounds, inferredRound));
+    state.liveStatus = "live";
+    state.errorMsg = "";
+
+    detectTierBreaks(previousDrafted, names);
+    detectRuns();
+  } catch (e) {
+    state.liveStatus = "error";
+    state.errorMsg = (e && e.message) || "Could not reach Sleeper API";
+  }
+  render();
+}
+
+function connect() {
+  const id = extractDraftId(state.draftId.trim());
+  if (!id) return;
+  state.draftId = id;
+  clearInterval(state.pollHandle);
+  fetchPicks(id);
+  state.pollHandle = setInterval(() => {
+    if (state.liveStatus === "live" || state.liveStatus === "error") fetchPicks(id);
+  }, 8000);
+}
+
+function extractDraftId(input) {
+  if (!input) return "";
+  const match = input.match(/draft\/nfl\/(\d+)/);
+  if (match) return match[1];
+  return input.replace(/[^\d]/g, "") ? input.trim() : input.trim();
+}
+
+function disconnect() {
+  clearInterval(state.pollHandle);
+  state.pollHandle = null;
+  state.liveStatus = "idle";
+  state.errorMsg = "";
+  render();
+}
+
+function toggleManualPlayer(name) {
+  const key = normalizeName(name);
+  if (state.draftedNames.has(key)) state.draftedNames.delete(key);
+  else state.draftedNames.add(key);
+  render();
+}
+
+function addManual() {
+  const trimmed = state.manualInput.trim();
+  if (!trimmed) return;
+  state.draftedNames.add(normalizeName(trimmed));
+  state.manualInput = "";
+  render();
+}
+
+function resetAll() {
+  state.draftedNames = new Set();
+  state.lastPickCount = 0;
+  state.currentRound = 1;
+  render();
+}
+
+async function findMySlot() {
+  const username = state.usernameInput.trim();
+  if (!username) return;
+  state.slotLookupMsg = "Looking up...";
+  render();
+  try {
+    const ures = await fetch(`https://api.sleeper.app/v1/user/${encodeURIComponent(username)}`);
+    if (!ures.ok) throw new Error("User not found");
+    const user = await ures.json();
+    const order = state._draftOrder;
+    if (!order || !(user.user_id in order)) {
+      state.slotLookupMsg = `Couldn't find ${username} in this draft's order.`;
+    } else {
+      state.yourSlot = order[user.user_id];
+      state.slotLookupMsg = `Found it — you're slot ${state.yourSlot}.`;
+    }
+  } catch (e) {
+    state.slotLookupMsg = (e && e.message) || "Lookup failed";
+  }
+  render();
+}
+
+// pickNoForRound(currentRound, slot, teams) only gives the right answer
+// while your turn *within that round* hasn't happened yet — once it has
+// (you're waiting on the rest of the round to turn over), it points at a
+// pick that already passed. Walk forward round-by-round instead.
+function computeYourNextPickNo(nextOverallPickNo, slot, teams) {
+  let round = Math.max(1, Math.ceil(nextOverallPickNo / teams));
+  let candidate = pickNoForRound(round, slot, teams);
+  while (candidate < nextOverallPickNo) {
+    round += 1;
+    candidate = pickNoForRound(round, slot, teams);
+  }
+  return candidate;
+}
+
+// Maps a round-plan's target position string to one of the position codes
+// used throughout RANKINGS ("QB"/"RB"/"WR"/"TE"), or null when the plan is
+// BPA / not tied to a single position (e.g. "Deep sleeper", "DST").
+function getPlanPosition(planPos) {
+  if (/QB/.test(planPos)) return "QB";
+  if (/Handcuff/i.test(planPos)) return "RB";
+  if (/RB/.test(planPos)) return "RB";
+  if (/WR/.test(planPos)) return "WR";
+  if (/TE/.test(planPos)) return "TE";
+  return null;
+}
+
+// Synthesizes tier state + run/flag data + the round-by-round plan +
+// roster need into a ranked shortlist — the actual "what should I do
+// right now" answer, not just the raw ingredients for one.
+function getRecommendations(available, plan, yourRoster) {
+  const posCounts = {};
+  yourRoster.forEach(p => { if (p.pos) posCounts[p.pos] = (posCounts[p.pos] || 0) + 1; });
+  const planPos = getPlanPosition(plan.pos);
+
+  const scored = available.slice(0, 40).map(([rank, name, pos, tier]) => {
+    let score = 200 - rank;
+    const reasons = [];
+
+    if (planPos && pos === planPos) {
+      score += 15;
+      reasons.push(`Round ${plan.r} plan calls for ${planPos}`);
+    }
+
+    const flag = FLAGS[name];
+    if (flag && flag.tag === "target") {
+      score += 10;
+      reasons.push(flag.note ? `Target: ${flag.note}` : "Flagged target");
+    } else if (flag && flag.tag === "avoid") {
+      score -= 20;
+      reasons.push(flag.note ? `Avoid: ${flag.note}` : "Flagged avoid — guide says pass");
+    } else if (flag && flag.tag === "pass") {
+      score -= 6;
+      reasons.push("Guide lists this as an “I'll pass”");
+    }
+
+    const tierMatesLeft = available.filter(([, n, p, t]) => p === pos && t === tier).length;
+    if (tierMatesLeft === 1) {
+      score += 8;
+      reasons.push(`Last ${pos} in tier ${tier} — next tier is a real drop-off`);
+    }
+
+    if (pos === "QB" && state.currentRound >= 6 && !posCounts.QB) {
+      score += 6;
+      reasons.push("No QB rostered yet");
+    }
+    if (pos === "TE" && state.currentRound >= 8 && !posCounts.TE) {
+      score += 6;
+      reasons.push("No TE rostered yet");
+    }
+
+    return {rank, name, pos, tier, score, reasons};
+  });
+
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, 5);
+}
+
+// ---------- Render ----------
+function render() {
+  const available = RANKINGS_TIERED.filter(([, name]) => !state.draftedNames.has(normalizeName(name)));
+  const topAvailable = available.slice(0, 15);
+  const plan = ROUND_PLAN.find(p => p.r === state.currentRound) || ROUND_PLAN[ROUND_PLAN.length - 1];
+  const yourNextPickNo = computeYourNextPickNo(state.lastPickCount + 1, state.yourSlot, state.teams);
+  const picksUntilYourTurn = yourNextPickNo - (state.lastPickCount + 1);
+  const isYourTurn = state.liveStatus === "live" && picksUntilYourTurn <= 0;
+  const recommendations = getRecommendations(available, plan, state.yourRoster);
+
+  const targetsStillUp = available.filter(([, name]) => FLAGS[name] && FLAGS[name].tag === "target").slice(0, 8);
+  const avoidStillUp = available.filter(([, name]) => FLAGS[name] && FLAGS[name].tag === "avoid").slice(0, 5);
+
+  const posBadge = pos => `<span class="pos-badge pos-${pos}">${pos}</span>`;
+
+  const connectionPanel = state.liveStatus !== "live" ? `
+    <div class="row">
+      <input id="draftIdInput" type="text" class="grow" placeholder="Paste Sleeper draft URL or draft_id" value="${escapeHtml(state.draftId)}" />
+      <button id="connectBtn">${state.liveStatus === "connecting" ? "Connecting…" : "Connect"}</button>
+    </div>
+  ` : `
+    <div class="row wrap">
+      <span class="row" style="gap:6px; font-size:13px; color: var(--text-success);">
+        <span class="dot"></span>
+        Live &middot; ${state.lastPickCount} picks made${state.draftStatus ? " &middot; " + escapeHtml(state.draftStatus.replace("_"," ")) : ""}
+      </span>
+      <button id="refreshBtn" class="secondary">Refresh now</button>
+      <button id="disconnectBtn" class="secondary">Disconnect</button>
+    </div>
+  `;
+
+  const errorBlock = state.liveStatus === "error"
+    ? `<p class="error-text">${escapeHtml(state.errorMsg)}. Check the draft_id, or use manual mode below instead.</p>`
+    : "";
+
+  const targetsHtml = targetsStillUp.length > 0 ? `
+    <div style="margin-bottom:12px;">
+      <div class="label" style="color: var(--text-success); text-transform:none; font-weight:600;">🎯 Flagged targets still available</div>
+      <div class="row wrap">
+        ${targetsStillUp.map(([, name, pos]) => `
+          <span class="chip target" title="${escapeHtml((FLAGS[name] && FLAGS[name].note) || "")}">${escapeHtml(name)} <span style="opacity:0.7;">(${pos})</span></span>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  const avoidHtml = avoidStillUp.length > 0 ? `
+    <div>
+      <div class="label" style="color: var(--text-danger); text-transform:none; font-weight:600;">⚠️ Flagged fades still available</div>
+      <div class="row wrap">
+        ${avoidStillUp.map(([, name, pos]) => `
+          <span class="chip avoid" title="${escapeHtml((FLAGS[name] && FLAGS[name].note) || "")}">${escapeHtml(name)} <span style="opacity:0.7;">(${pos})</span></span>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  const recommendationHtml = recommendations.length === 0 ? '<p class="muted-note">No recommendation yet — connect live sync or add manual picks.</p>' : `
+    <div class="row" style="align-items:flex-start; gap:14px; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border);">
+      ${posBadge(recommendations[0].pos)}
+      <div class="grow">
+        <div style="font-size:17px; font-weight:600;">${escapeHtml(recommendations[0].name)} <span class="pill" style="margin-left:4px;">T${recommendations[0].tier}</span></div>
+        ${recommendations[0].reasons.length > 0 ? `<ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color: var(--text-secondary);">${recommendations[0].reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>` : ""}
+      </div>
+      <button class="secondary" data-drafted-name="${escapeHtml(recommendations[0].name)}">Mark drafted</button>
+    </div>
+    <div class="row wrap" style="gap:6px;">
+      ${recommendations.slice(1).map(r => `
+        <span class="chip" style="background:var(--surface-2);" title="${escapeHtml(r.reasons.join(" · "))}">${posBadge(r.pos)} ${escapeHtml(r.name)}</span>
+      `).join("")}
+    </div>
+  `;
+
+  const bestAvailableHtml = topAvailable.map(([rank, name, pos, tier]) => {
+    const flag = FLAGS[name];
+    let icon = "";
+    if (flag && flag.tag === "target") icon = `<span class="flag-icon" title="Target">🎯</span>`;
+    if (flag && flag.tag === "avoid") icon = `<span class="flag-icon" title="Avoid">⚠️</span>`;
+    return `
+      <div class="player-row">
+        <span class="rank">${rank}</span>
+        ${posBadge(pos)}
+        <span class="player-name">${escapeHtml(name)}</span>
+        <span class="pill" style="font-weight:500;" title="Tier ${tier} at ${pos}">T${tier}</span>
+        ${icon}
+        <button class="secondary" data-drafted-name="${escapeHtml(name)}">Mark drafted</button>
+      </div>
+    `;
+  }).join("");
+
+  const alertsHtml = state.alerts.length === 0
+    ? '<p class="muted-note">No alerts yet.</p>'
+    : state.alerts.map(a => {
+        const colors = a.type === "tier-break"
+          ? {bg: "var(--bg-warning)", text: "var(--text-warning)"}
+          : a.type === "run"
+            ? {bg: "var(--bg-danger)", text: "var(--text-danger)"}
+            : {bg: "var(--bg-accent)", text: "var(--text-accent)"};
+        return `
+          <div class="card-flat" style="margin-bottom:6px; padding:10px 12px;">
+            <span class="pill" style="background:${colors.bg}; color:${colors.text}; margin-right:8px;">${a.type}</span>
+            <span style="font-size:13px;">${escapeHtml(a.text)}</span>
+          </div>
+        `;
+      }).join("");
+
+  const rosterWarnings = checkRosterWarnings();
+  const rosterHtml = state.yourRoster.length === 0
+    ? '<p class="muted-note">No picks yet.</p>'
+    : `<div class="row wrap">${state.yourRoster.map(p => `<span class="chip" style="background:var(--surface-2);">${posBadge(p.pos || "?")} ${escapeHtml(p.name)}</span>`).join("")}</div>`;
+
+  document.getElementById("app").innerHTML = `
+    <h1>Bozo Club Draft Assistant</h1>
+    <p class="subtitle">Pick ${state.yourSlot} of ${state.teams} &middot; ${state.teams}-team PPR &middot; snake draft</p>
+
+    <div class="card">
+      <div class="label">Sleeper live sync</div>
+      ${connectionPanel}
+      ${errorBlock}
+      <p class="muted-note">Paste the full draft URL or just the draft_id. Auto-refreshes every 8s while live.</p>
+    </div>
+
+    <div class="card">
+      <div class="label">Your draft settings</div>
+      <div class="row wrap" style="gap:16px;">
+        <div class="field-inline">
+          <label for="slotInput">Your slot</label>
+          <input id="slotInput" type="number" min="1" max="${state.teams}" value="${state.yourSlot}" />
+        </div>
+        <div class="field-inline">
+          <label for="teamsInput">Teams</label>
+          <input id="teamsInput" type="number" min="2" max="20" value="${state.teams}" />
+        </div>
+        <div class="row grow" style="min-width:220px;">
+          <input id="usernameInput" type="text" placeholder="Sleeper username (auto-find slot)" class="grow" value="${escapeHtml(state.usernameInput)}" />
+          <button id="findSlotBtn" class="secondary">Find</button>
+        </div>
+      </div>
+      ${state.slotLookupMsg ? `<p class="status-text">${escapeHtml(state.slotLookupMsg)}</p>` : ""}
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="label">Round</div><div class="value">${state.currentRound}</div></div>
+      <div class="stat"><div class="label">Your next pick</div><div class="value">#${yourNextPickNo}</div></div>
+      <div class="stat"><div class="label">Drafted so far</div><div class="value">${state.draftedNames.size}</div></div>
+    </div>
+
+    <div class="card" style="border-color: var(--accent);">
+      <div class="row" style="margin-bottom:10px;">
+        <span class="label" style="margin-bottom:0;">${isYourTurn ? "🎯 Recommended pick" : `⏳ ${picksUntilYourTurn} pick${picksUntilYourTurn === 1 ? "" : "s"} until your turn (#${yourNextPickNo})`}</span>
+      </div>
+      ${recommendationHtml}
+    </div>
+
+    <div class="card-flat">
+      <div class="row" style="margin-bottom:6px;">
+        <span class="pill">Round ${plan.r} plan</span>
+        <span style="font-size:15px; font-weight:600;">${escapeHtml(plan.pos)}</span>
+      </div>
+      ${plan.note ? `<p style="font-size:14px; color: var(--text-secondary); margin:0;">${escapeHtml(plan.note)}</p>` : ""}
+    </div>
+
+    ${(targetsStillUp.length > 0 || avoidStillUp.length > 0) ? `<div style="margin-bottom:1.25rem;">${targetsHtml}${avoidHtml}</div>` : ""}
+
+    <div style="margin-bottom:1.25rem;">
+      <h2>Best available</h2>
+      <div id="best-available-list">${bestAvailableHtml}</div>
+    </div>
+
+    <div style="margin-bottom:1.25rem;">
+      <h2>Draft alerts</h2>
+      <div id="alerts-list">${alertsHtml}</div>
+    </div>
+
+    <div style="margin-bottom:1.25rem;">
+      <h2>Your roster</h2>
+      <div id="roster-list">${rosterHtml}</div>
+      ${rosterWarnings.map(w => `<p class="error-text" style="margin-top:6px;">${escapeHtml(w)}</p>`).join("")}
+    </div>
+
+    <div class="card">
+      <div class="label">Manual entry (if live sync isn't available)</div>
+      <div class="row" style="margin-bottom:8px;">
+        <input id="manualInput" type="text" class="grow" placeholder="Player name drafted by anyone" value="${escapeHtml(state.manualInput)}" />
+        <button id="addManualBtn">Add</button>
+      </div>
+      <div class="row">
+        <label class="field-inline" style="gap:6px;">Round:
+          <input id="roundInput" type="number" min="1" max="${state.rounds}" value="${state.currentRound}" />
+        </label>
+        <button id="resetBtn" class="danger-ghost" style="margin-left:auto;">Reset draft</button>
+      </div>
+    </div>
+  `;
+
+  wireEvents();
+}
+
+function wireEvents() {
+  const byId = id => document.getElementById(id);
+
+  const draftIdInput = byId("draftIdInput");
+  if (draftIdInput) draftIdInput.addEventListener("input", e => { state.draftId = e.target.value; });
+  const connectBtn = byId("connectBtn");
+  if (connectBtn) connectBtn.addEventListener("click", connect);
+  if (draftIdInput) draftIdInput.addEventListener("keydown", e => { if (e.key === "Enter") connect(); });
+
+  const refreshBtn = byId("refreshBtn");
+  if (refreshBtn) refreshBtn.addEventListener("click", () => fetchPicks(state.draftId));
+  const disconnectBtn = byId("disconnectBtn");
+  if (disconnectBtn) disconnectBtn.addEventListener("click", disconnect);
+
+  const slotInput = byId("slotInput");
+  if (slotInput) slotInput.addEventListener("change", e => {
+    state.yourSlot = Math.max(1, Math.min(state.teams, Number(e.target.value) || 1));
+    render();
+  });
+  const teamsInput = byId("teamsInput");
+  if (teamsInput) teamsInput.addEventListener("change", e => {
+    state.teams = Math.max(2, Math.min(20, Number(e.target.value) || 12));
+    render();
+  });
+  const usernameInput = byId("usernameInput");
+  if (usernameInput) usernameInput.addEventListener("input", e => { state.usernameInput = e.target.value; });
+  const findSlotBtn = byId("findSlotBtn");
+  if (findSlotBtn) findSlotBtn.addEventListener("click", findMySlot);
+
+  document.querySelectorAll("[data-drafted-name]").forEach(btn => {
+    btn.addEventListener("click", () => toggleManualPlayer(btn.getAttribute("data-drafted-name")));
+  });
+
+  const manualInput = byId("manualInput");
+  if (manualInput) {
+    manualInput.addEventListener("input", e => { state.manualInput = e.target.value; });
+    manualInput.addEventListener("keydown", e => { if (e.key === "Enter") addManual(); });
+  }
+  const addManualBtn = byId("addManualBtn");
+  if (addManualBtn) addManualBtn.addEventListener("click", addManual);
+
+  const roundInput = byId("roundInput");
+  if (roundInput) roundInput.addEventListener("change", e => {
+    state.currentRound = Math.min(state.rounds, Math.max(1, Number(e.target.value) || 1));
+    render();
+  });
+
+  const resetBtn = byId("resetBtn");
+  if (resetBtn) resetBtn.addEventListener("click", resetAll);
+}
+
+render();
+// Auto-connect on load since a draft_id is pre-filled
+connect();
+</script>
+</body>
+</html>
