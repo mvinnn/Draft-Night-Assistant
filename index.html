@@ -292,7 +292,11 @@ const ROUND_PLAN = [
   {r:15, pos:"Stash/Handcuff", note:"No kicker in this league — use it as a real roster spot"},
 ];
 
-const DEFAULT_DRAFT_ID = "1397995205646409728";
+// For local testing only — never used as a shipped default (see
+// initFromUrlParams). A hardcoded default here would mean every peer who
+// opens the shared GitHub Pages link auto-connects to this specific mock
+// draft and gets silently assumed to be sitting in slot 12.
+const TEST_DRAFT_ID = "1397995205646409728";
 
 // Tier boundaries are within-position (a player's rank among their own
 // position), not their overall 1-150 rank.
@@ -315,19 +319,21 @@ const RANKINGS_TIERED = assignTiers(RANKINGS);
 // ---------- State ----------
 const state = {
   draftedNames: new Set(), // normalized-name keys, see normalizeName()
-  draftId: DEFAULT_DRAFT_ID,
+  draftId: "", // filled from the ?draft= URL param on load, see initFromUrlParams; no hardcoded fallback
   liveStatus: "idle", // idle | connecting | live | error
   errorMsg: "",
   lastPickCount: 0,
   manualInput: "",
   currentRound: 1,
-  yourSlot: 12,
+  yourSlot: 12, // default only; overridden by ?user= + findMySlot() when the URL provides it
   teams: 12,
   rounds: 15,
   draftStatus: null, // pre_draft | drafting | complete
   pollHandle: null,
   usernameInput: "",
   slotLookupMsg: "",
+  lastFetchedAt: null, // Date.now() of the last successful poll, for the staleness indicator
+  detailsOpen: false, // default view is the plain-English recommendation card only; rankings/tiers/alerts are opt-in
   yourRoster: [], // {name, pos} the user has actually drafted, from live sync
   pickHistory: [], // ordered {pickNo, name, pos} for all picks, for run detection
   alerts: [], // {id, type: "tier-break"|"run"|"roster", text, pickNo}, newest first
@@ -482,6 +488,7 @@ async function fetchPicks(id) {
     state.currentRound = Math.max(1, Math.min(state.rounds, inferredRound));
     state.liveStatus = "live";
     state.errorMsg = "";
+    state.lastFetchedAt = Date.now();
 
     detectTierBreaks(previousDrafted, names);
     detectRuns();
@@ -492,15 +499,52 @@ async function fetchPicks(id) {
   render();
 }
 
+// Sleeper's public API sits behind a CDN edge cache whose s-maxage for a
+// live draft's /picks response is 30s (confirmed via response headers) —
+// well above this 8s interval. Polling faster than that doesn't get
+// fresher data, it just re-fetches the same cached snapshot more often,
+// so a real pick can take up to ~30s to become visible no matter what.
+// That's a server-side cache TTL, not something a client poll interval
+// can fix — the mitigation is surfacing the staleness (see the "updated
+// Xs ago" indicator) and keeping "Refresh now" / manual entry available
+// for right-before-your-turn checks, not shortening this number.
+const POLL_INTERVAL_MS = 8000;
+
+function startPolling(id) {
+  clearInterval(state.pollHandle);
+  state.pollHandle = setInterval(() => {
+    if (state.liveStatus === "live" || state.liveStatus === "error") fetchPicks(id);
+  }, POLL_INTERVAL_MS);
+}
+
 function connect() {
   const id = extractDraftId(state.draftId.trim());
   if (!id) return;
   state.draftId = id;
-  clearInterval(state.pollHandle);
   fetchPicks(id);
-  state.pollHandle = setInterval(() => {
-    if (state.liveStatus === "live" || state.liveStatus === "error") fetchPicks(id);
-  }, 8000);
+  startPolling(id);
+}
+
+// Reads ?draft=<id or url>&user=<sleeper_username> from the page's own
+// URL so a shared link can auto-configure itself per recipient, instead
+// of shipping with a hardcoded draft_id and slot=12 that only ever made
+// sense for one person's dev testing. No params -> stays a blank,
+// manual-entry-ready session; nothing auto-connects.
+async function initFromUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  const draftParam = params.get("draft");
+  if (!draftParam) return;
+  const id = extractDraftId(draftParam.trim());
+  if (!id) return;
+  state.draftId = id;
+  await fetchPicks(id);
+  startPolling(id);
+
+  const userParam = params.get("user");
+  if (userParam) {
+    state.usernameInput = userParam.trim();
+    await findMySlot();
+  }
 }
 
 function extractDraftId(input) {
@@ -596,43 +640,57 @@ function getRecommendations(available, plan, yourRoster) {
   yourRoster.forEach(p => { if (p.pos) posCounts[p.pos] = (posCounts[p.pos] || 0) + 1; });
   const planPos = getPlanPosition(plan.pos);
 
-  const scored = available.slice(0, 40).map(([rank, name, pos, tier]) => {
-    let score = 200 - rank;
-    const reasons = [];
+  // "avoid"/"pass" are categorical guide calls ("don't take this"), not a
+  // mild preference — hard-exclude from the recommendation shortlist
+  // rather than just docking points, so a rank-heavy avoid/pass can't
+  // still win the #1 slot. They still show in "Best available" with their
+  // ⚠️/🎯 icons; this pool is only for what gets actively recommended.
+  const candidatePool = available.filter(([, name]) => {
+    const tag = FLAGS[name] && FLAGS[name].tag;
+    return tag !== "avoid" && tag !== "pass";
+  });
 
-    if (planPos && pos === planPos) {
-      score += 15;
-      reasons.push(`Round ${plan.r} plan calls for ${planPos}`);
-    }
+  const scored = candidatePool.slice(0, 40).map(([rank, name, pos, tier]) => {
+    let score = 200 - rank;
+    const reasons = []; // technical, for the "Show details" view
+    let headline = null; // one plain-English sentence for the default view, no tier/BPA/PPG jargon
 
     const flag = FLAGS[name];
     if (flag && flag.tag === "target") {
       score += 10;
       reasons.push(flag.note ? `Target: ${flag.note}` : "Flagged target");
-    } else if (flag && flag.tag === "avoid") {
-      score -= 20;
-      reasons.push(flag.note ? `Avoid: ${flag.note}` : "Flagged avoid — guide says pass");
-    } else if (flag && flag.tag === "pass") {
-      score -= 6;
-      reasons.push("Guide lists this as an “I'll pass”");
+      headline = flag.note || "One of the guide's flagged targets this year";
     }
 
+    if (planPos && pos === planPos) {
+      score += 15;
+      reasons.push(`Round ${plan.r} plan calls for ${planPos}`);
+      if (!headline) headline = "Good value at this point in the draft";
+    }
+
+    // Scarcity is about the whole board, not just the recommendable pool —
+    // count against `available`, not `candidatePool`.
     const tierMatesLeft = available.filter(([, n, p, t]) => p === pos && t === tier).length;
     if (tierMatesLeft === 1) {
       score += 8;
       reasons.push(`Last ${pos} in tier ${tier} — next tier is a real drop-off`);
+      if (!headline) headline = `Last good ${pos} before the next tier drops off`;
     }
 
     if (pos === "QB" && state.currentRound >= 6 && !posCounts.QB) {
       score += 6;
       reasons.push("No QB rostered yet");
+      if (!headline) headline = "You don't have a QB yet";
     }
     if (pos === "TE" && state.currentRound >= 8 && !posCounts.TE) {
       score += 6;
       reasons.push("No TE rostered yet");
+      if (!headline) headline = "You don't have a TE yet";
     }
 
-    return {rank, name, pos, tier, score, reasons};
+    if (!headline) headline = "Best player left on the board";
+
+    return {rank, name, pos, tier, score, reasons, headline};
   });
 
   scored.sort((a, b) => b.score - a.score);
@@ -665,6 +723,7 @@ function render() {
         <span class="dot"></span>
         Live &middot; ${state.lastPickCount} picks made${state.draftStatus ? " &middot; " + escapeHtml(state.draftStatus.replace("_"," ")) : ""}
       </span>
+      <span id="staleness-indicator" style="font-size:12px; color: var(--text-muted);">updated just now</span>
       <button id="refreshBtn" class="secondary">Refresh now</button>
       <button id="disconnectBtn" class="secondary">Disconnect</button>
     </div>
@@ -696,21 +755,34 @@ function render() {
     </div>
   ` : "";
 
-  const recommendationHtml = recommendations.length === 0 ? '<p class="muted-note">No recommendation yet — connect live sync or add manual picks.</p>' : `
-    <div class="row" style="align-items:flex-start; gap:14px; margin-bottom:10px; padding-bottom:10px; border-bottom:1px solid var(--border);">
-      ${posBadge(recommendations[0].pos)}
-      <div class="grow">
-        <div style="font-size:17px; font-weight:600;">${escapeHtml(recommendations[0].name)} <span class="pill" style="margin-left:4px;">T${recommendations[0].tier}</span></div>
-        ${recommendations[0].reasons.length > 0 ? `<ul style="margin:6px 0 0; padding-left:18px; font-size:13px; color: var(--text-secondary);">${recommendations[0].reasons.map(r => `<li>${escapeHtml(r)}</li>`).join("")}</ul>` : ""}
+  // Default view: one plain-English sentence, no tier numbers / "BPA" /
+  // PPG-gap stats. The full technical reasoning still exists (in each
+  // recommendation's `.reasons`) and surfaces in the "Show details" chip
+  // tooltips, but the headline card never shows raw jargon.
+  const recommendationHtml = recommendations.length === 0 ? '<p class="muted-note">No recommendation yet — connect live sync or add manual picks.</p>'
+    : isYourTurn ? `
+      <div class="row" style="align-items:flex-start; gap:14px;">
+        ${posBadge(recommendations[0].pos)}
+        <div class="grow">
+          <div style="font-size:19px; font-weight:600;">Pick ${escapeHtml(recommendations[0].name)}</div>
+          <p style="margin:6px 0 0; font-size:14px; color: var(--text-secondary);">${escapeHtml(recommendations[0].headline)}</p>
+        </div>
+        <button class="secondary" data-drafted-name="${escapeHtml(recommendations[0].name)}">Already drafted<br>(fix tracking)</button>
       </div>
-      <button class="secondary" data-drafted-name="${escapeHtml(recommendations[0].name)}">Mark drafted</button>
-    </div>
-    <div class="row wrap" style="gap:6px;">
-      ${recommendations.slice(1).map(r => `
-        <span class="chip" style="background:var(--surface-2);" title="${escapeHtml(r.reasons.join(" · "))}">${posBadge(r.pos)} ${escapeHtml(r.name)}</span>
-      `).join("")}
-    </div>
-  `;
+    ` : `
+      <p style="margin:0 0 10px; font-size:13px; color: var(--text-secondary); text-transform:uppercase; letter-spacing:0.02em; font-weight:600;">Worth watching</p>
+      <div style="display:flex; flex-direction:column; gap:10px;">
+        ${recommendations.slice(0, 2).map(r => `
+          <div class="row" style="align-items:flex-start; gap:10px;">
+            ${posBadge(r.pos)}
+            <div class="grow">
+              <div style="font-size:15px; font-weight:600;">${escapeHtml(r.name)}</div>
+              <div style="font-size:13px; color: var(--text-secondary);">${escapeHtml(r.headline)}</div>
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
 
   const bestAvailableHtml = topAvailable.map(([rank, name, pos, tier]) => {
     const flag = FLAGS[name];
@@ -724,7 +796,7 @@ function render() {
         <span class="player-name">${escapeHtml(name)}</span>
         <span class="pill" style="font-weight:500;" title="Tier ${tier} at ${pos}">T${tier}</span>
         ${icon}
-        <button class="secondary" data-drafted-name="${escapeHtml(name)}">Mark drafted</button>
+        <button class="secondary" data-drafted-name="${escapeHtml(name)}" title="This only fixes this app's tracking — it does not submit a real pick in Sleeper">Already drafted</button>
       </div>
     `;
   }).join("");
@@ -753,12 +825,15 @@ function render() {
   document.getElementById("app").innerHTML = `
     <h1>Bozo Club Draft Assistant</h1>
     <p class="subtitle">Pick ${state.yourSlot} of ${state.teams} &middot; ${state.teams}-team PPR &middot; snake draft</p>
+    <p style="font-size:12.5px; color: var(--text-muted); margin:-6px 0 1.25rem; padding:8px 10px; background: var(--surface-2); border-radius: 8px;">
+      ⚠️ This app only tells you who to pick — make your actual pick in the Sleeper app or site.
+    </p>
 
     <div class="card">
       <div class="label">Sleeper live sync</div>
       ${connectionPanel}
       ${errorBlock}
-      <p class="muted-note">Paste the full draft URL or just the draft_id. Auto-refreshes every 8s while live.</p>
+      <p class="muted-note">Paste the full draft URL or just the draft_id. Auto-refreshes every 8s while live — Sleeper's own API can still lag ~30s behind the draft room (their public endpoint is CDN-cached), so use "Refresh now" or manual entry right before your pick.</p>
     </div>
 
     <div class="card">
@@ -788,11 +863,16 @@ function render() {
 
     <div class="card" style="border-color: var(--accent);">
       <div class="row" style="margin-bottom:10px;">
-        <span class="label" style="margin-bottom:0;">${isYourTurn ? "🎯 Recommended pick" : `⏳ ${picksUntilYourTurn} pick${picksUntilYourTurn === 1 ? "" : "s"} until your turn (#${yourNextPickNo})`}</span>
+        <span style="font-size:15px; font-weight:600;">${isYourTurn ? "🎯 It's your turn" : `⏳ Not your turn yet — ${picksUntilYourTurn} pick${picksUntilYourTurn === 1 ? "" : "s"} away`}</span>
       </div>
       ${recommendationHtml}
     </div>
 
+    <button id="toggleDetailsBtn" class="secondary" style="width:100%; margin-bottom:1.25rem;">
+      ${state.detailsOpen ? "▴ Hide details" : "▾ Show details (full rankings, tiers, alerts, roster plan)"}
+    </button>
+
+    ${state.detailsOpen ? `
     <div class="card-flat">
       <div class="row" style="margin-bottom:6px;">
         <span class="pill">Round ${plan.r} plan</span>
@@ -832,6 +912,7 @@ function render() {
         <button id="resetBtn" class="danger-ghost" style="margin-left:auto;">Reset draft</button>
       </div>
     </div>
+    ` : ""}
   `;
 
   wireEvents();
@@ -866,6 +947,12 @@ function wireEvents() {
   const findSlotBtn = byId("findSlotBtn");
   if (findSlotBtn) findSlotBtn.addEventListener("click", findMySlot);
 
+  const toggleDetailsBtn = byId("toggleDetailsBtn");
+  if (toggleDetailsBtn) toggleDetailsBtn.addEventListener("click", () => {
+    state.detailsOpen = !state.detailsOpen;
+    render();
+  });
+
   document.querySelectorAll("[data-drafted-name]").forEach(btn => {
     btn.addEventListener("click", () => toggleManualPlayer(btn.getAttribute("data-drafted-name")));
   });
@@ -889,8 +976,20 @@ function wireEvents() {
 }
 
 render();
-// Auto-connect on load since a draft_id is pre-filled
-connect();
+// No baked-in draft/slot for a shared link — only auto-connects when the
+// URL itself carries ?draft=(&user=), e.g. a personalized link generated
+// per teammate. Opening the bare page is a blank, manual-entry session.
+initFromUrlParams();
+
+// Lightweight ticker for the "updated Xs ago" staleness indicator — kept
+// separate from render() so it doesn't blow away focus/typing in the
+// draft_id or manual-entry inputs every second.
+setInterval(() => {
+  const el = document.getElementById("staleness-indicator");
+  if (!el || !state.lastFetchedAt) return;
+  const secs = Math.round((Date.now() - state.lastFetchedAt) / 1000);
+  el.textContent = secs <= 1 ? "updated just now" : `updated ${secs}s ago`;
+}, 1000);
 </script>
 </body>
 </html>
