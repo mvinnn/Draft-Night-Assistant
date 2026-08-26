@@ -785,18 +785,36 @@ function getRecommendations(available, plan, yourRoster) {
     }
 
     if (planPos && pos === planPos) {
-      score += 15;
-      reasons.push(`Round ${plan.r} plan calls for ${planPos}`);
-      // The round plan's own note is real strategic reasoning (e.g. round
-      // 1's is literally an argument against chasing "value"), so it's a
-      // better fallback than a canned filler line — but it's still a
-      // ROUND-level note, identical for every candidate at that position,
-      // not proof this specific player is the one to take. Only plan notes
-      // that don't name specific other players belong here (see ROUND_PLAN
-      // above — round 5/10 notes were rewritten for exactly this reason
-      // after two different WRs both got shown a note naming four
-      // completely different receivers).
-      if (!headline) headline = plan.note || `Round ${plan.r} calls for ${planPos} here`;
+      // The plan calls for this position in this round — but if the
+      // roster already satisfies however many rounds' worth of this
+      // position the plan has called for UP TO this round, that need is
+      // already met and this shouldn't fire again just because the round
+      // number matches. This is what let round 8 tell you to draft a 2nd
+      // QB (Trevor Lawrence) one round after you'd already taken a QB
+      // (Caleb Williams) off the board on your own — the plan doesn't
+      // know your actual roster, it just always says "QB" at round 8.
+      // Comparing against how many QB/TE/etc rounds the plan has passed
+      // through (not a flat cap) is what lets round 12's deliberate QB2
+      // upside slot still fire correctly even though round 8 already
+      // filled QB1.
+      const plannedSoFar = ROUND_PLAN.filter(p => p.r <= plan.r && getPlanPosition(p.pos) === planPos).length;
+      const already = posCounts[planPos] || 0;
+      if (already < plannedSoFar) {
+        score += 15;
+        reasons.push(`Round ${plan.r} plan calls for ${planPos}`);
+        // The round plan's own note is real strategic reasoning (e.g. round
+        // 1's is literally an argument against chasing "value"), so it's a
+        // better fallback than a canned filler line — but it's still a
+        // ROUND-level note, identical for every candidate at that position,
+        // not proof this specific player is the one to take. Only plan notes
+        // that don't name specific other players belong here (see ROUND_PLAN
+        // above — round 5/10 notes were rewritten for exactly this reason
+        // after two different WRs both got shown a note naming four
+        // completely different receivers).
+        if (!headline) headline = plan.note || `Round ${plan.r} calls for ${planPos} here`;
+      } else {
+        reasons.push(`Round ${plan.r} plan called for ${planPos}, but you already have ${already} rostered — that need looks filled`);
+      }
     }
 
     if (pos === "QB" && state.currentRound >= 6 && !posCounts.QB) {
