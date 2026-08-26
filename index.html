@@ -254,22 +254,22 @@ const FLAGS = {
   "Terry McLaurin": {tag:"target"}, "Parker Washington": {tag:"target", note:"454 rec yds in JAX's final 4 games"},
   "Colston Loveland": {tag:"target"}, "Tyler Warren": {tag:"target", note:"Target share jumps 21%→30% without Pittman — Pittman's gone", risk:6},
   "Cam Skattebo": {tag:"target"}, "Rome Odunze": {tag:"target"}, "Caleb Williams": {tag:"target"},
-  "A.J. Brown": {tag:"target", note:"Elite target efficiency even in a bad scheme fit", risk:8},
+  "A.J. Brown": {tag:"target", note:"Traded PHI→NE; elite target efficiency, fresh offense, ADP ~#28", risk:8},
   "Luther Burden III": {tag:"target", note:"8th in rookie fantasy pts/snap; Moore's exit clears target share", risk:6},
   "Marvin Harrison Jr.": {tag:"target", risk:7},
   "Brock Bowers": {tag:"target", note:"Best rookie TE ever statistically; TE4 through chaos", risk:5},
   "Harold Fannin Jr.": {tag:"target", note:"Higher tgt/route than McBride in 2025; Njoku gone", risk:6},
   "Dalton Kincaid": {tag:"target", note:"#1 TE in nearly every efficiency stat, capped by usage not talent"},
-  "Kyler Murray": {tag:"target", note:"QB5 in PPG 2019-2024, ADP has him at QB14-17"},
+  "Kyler Murray": {tag:"target", note:"Released by ARI, signed MIN as reported Wk1 starter over McCarthy; ADP fell to ~round 12 — cheap dart given a foot injury ended his 2025 at 5 games", risk:8},
   "Malik Willis": {tag:"target", note:"1st in fantasy pts/snap among QBs in 2025"},
   "Ray Davis": {tag:"target", note:"Joel's explicit Round 15 value pick, cemented handcuff"},
 
   "Justin Jefferson": {tag:"pass"}, "De'Von Achane": {tag:"pass"}, "Kyren Williams": {tag:"pass"},
   "Josh Jacobs": {tag:"pass"}, "Quinshon Judkins": {tag:"pass"}, "Jacory Croskey-Merritt": {tag:"pass"},
-  "Michael Pittman Jr.": {tag:"pass"}, "Jakobi Meyers": {tag:"pass"}, "Rachaad White": {tag:"pass"},
+  "Rachaad White": {tag:"pass", note:"Traded to WAS into a crowded 4-way backfield plus a hamstring injury — worse landing spot than TB"},
 
   "Trey McBride": {tag:"avoid", note:"Reach at current price per Joel"},
-  "Tony Pollard": {tag:"avoid"}, "Aaron Jones Sr.": {tag:"avoid"},
+  "Tony Pollard": {tag:"avoid"}, "Aaron Jones Sr.": {tag:"avoid", note:"On IR (hamstring), expected out 1+ month; Jordan Mason taking real camp reps ahead of him"},
   "Travis Kelce": {tag:"avoid", note:"Age 37, 3 yrs declining PPG, 28th in TE red-zone share", risk:9},
   "Courtland Sutton": {tag:"avoid"}, "Khalil Shakir": {tag:"avoid"},
 };
@@ -509,6 +509,12 @@ async function fetchPicks(id) {
 // Xs ago" indicator) and keeping "Refresh now" / manual entry available
 // for right-before-your-turn checks, not shortening this number.
 const POLL_INTERVAL_MS = 8000;
+
+// Player rankings/FLAGS below are a static snapshot, not a live feed —
+// bump this string by hand whenever RANKINGS/FLAGS is re-checked against
+// real news/ADP (see PLAYER_DATA_FRESHNESS_*.md for the process). Shown
+// in the footer so the app never silently implies its data is current.
+const PLAYER_DATA_LAST_VERIFIED = "Aug 25, 2026";
 
 function startPolling(id) {
   clearInterval(state.pollHandle);
@@ -913,6 +919,10 @@ function render() {
       </div>
     </div>
     ` : ""}
+
+    <p style="font-size:11px; color: var(--text-muted); text-align:center; margin:1.5rem 0 0.5rem;">
+      Player rankings/notes last verified against real news &amp; ADP: ${PLAYER_DATA_LAST_VERIFIED}. Not a live feed — sanity-check anything time-sensitive (injuries, depth charts) before your pick.
+    </p>
   `;
 
   wireEvents();
