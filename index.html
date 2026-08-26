@@ -249,14 +249,17 @@ const FLAGS = {
   "Ashton Jeanty": {tag:"target", note:"AYAC jumps 17th→1st adjusted for situation; new OL+HC", risk:6},
   "Chase Brown": {tag:"target", note:"Zac Taylor produces an RB1 every year he's had the starter"},
   "Kenneth Walker III": {tag:"target", note:"Best situation of his career, now on KC", risk:6},
-  "Bhayshul Tuten": {tag:"target"}, "TreVeyon Henderson": {tag:"target"},
+  "Bhayshul Tuten": {tag:"target", note:"Etienne gone; Coen wants 1,500/16 from him, RB25 ADP for a top-5 rushing-success-rate back"},
+  "TreVeyon Henderson": {tag:"target", note:"Already outproduced Stevenson in TDs/YPC as a rookie; RB24 ADP undervalues his RB3 pace when featured — depth-chart slot has conflicting camp reports, worth a gut-check"},
   "Jonathon Brooks": {tag:"target", note:"Canales' RBs outperform draft capital every year", risk:10},
-  "Terry McLaurin": {tag:"target"}, "Parker Washington": {tag:"target", note:"454 rec yds in JAX's final 4 games"},
-  "Colston Loveland": {tag:"target"}, "Tyler Warren": {tag:"target", note:"Target share jumps 21%→30% without Pittman — Pittman's gone", risk:6},
-  "Cam Skattebo": {tag:"target"}, "Rome Odunze": {tag:"target"}, "Caleb Williams": {tag:"target"},
+  "Terry McLaurin": {tag:"target", note:"WR18 ADP after injury-wrecked 2025, but route/target efficiency held; healthy Daniels changes everything"}, "Parker Washington": {tag:"target", note:"454 rec yds in JAX's final 4 games"},
+  "Colston Loveland": {tag:"target", note:"Played like flex WR16 over 2nd half of 2025; DJ Moore trade to Buffalo opens even more targets"}, "Tyler Warren": {tag:"target", note:"Target share jumps 21%→30% without Pittman — Pittman's gone", risk:6},
+  "Cam Skattebo": {tag:"target", note:"GM says fully cleared for camp after Nov ankle fracture/ligament rupture, but recovery risk is real — buyer beware value"},
+  "Rome Odunze": {tag:"target", note:"6th-round cost with DJ Moore now in Buffalo; only Burden/Loveland rank ahead of him in Chicago's target hierarchy"},
+  "Caleb Williams": {tag:"target", note:"18.7 PPG in Y2 with Ben Johnson; rushing floor (17% of points) makes him a cheap late-round QB1 source"},
   "A.J. Brown": {tag:"target", note:"Traded PHI→NE; elite target efficiency, fresh offense, ADP ~#28", risk:8},
   "Luther Burden III": {tag:"target", note:"8th in rookie fantasy pts/snap; Moore's exit clears target share", risk:6},
-  "Marvin Harrison Jr.": {tag:"target", risk:7},
+  "Marvin Harrison Jr.": {tag:"target", note:"Camp drops are real and Kyler Murray is gone to Minnesota — Brissett/Beck/Minshew battle is a genuine red flag, not just hype", risk:7},
   "Brock Bowers": {tag:"target", note:"Best rookie TE ever statistically; TE4 through chaos", risk:5},
   "Harold Fannin Jr.": {tag:"target", note:"Higher tgt/route than McBride in 2025; Njoku gone", risk:6},
   "Dalton Kincaid": {tag:"target", note:"#1 TE in nearly every efficiency stat, capped by usage not talent"},
@@ -264,14 +267,20 @@ const FLAGS = {
   "Malik Willis": {tag:"target", note:"1st in fantasy pts/snap among QBs in 2025"},
   "Ray Davis": {tag:"target", note:"Joel's explicit Round 15 value pick, cemented handcuff"},
 
-  "Justin Jefferson": {tag:"pass"}, "De'Von Achane": {tag:"pass"}, "Kyren Williams": {tag:"pass"},
-  "Josh Jacobs": {tag:"pass"}, "Quinshon Judkins": {tag:"pass"}, "Jacory Croskey-Merritt": {tag:"pass"},
-  "Rachaad White": {tag:"pass", note:"Traded to WAS into a crowded 4-way backfield plus a hamstring injury — worse landing spot than TB"},
+  "Justin Jefferson": {tag:"pass", note:"WR6/Round-1 cost after an 11.9 PPG season; Kyler Murray is unproven, better value sits one tier down"},
+  "De'Von Achane": {tag:"pass", note:"McDaniel and Tua both gone, Waddle/Hill traded away too — Malik Willis under center guts the offense around him"},
+  "Kyren Williams": {tag:"pass", note:"Contract year but Corum is stealing early-down work; Rams' plan hinges on Stafford's status"},
+  "Josh Jacobs": {tag:"pass", note:"RB8-10 price bakes in his TD rate; volume behind Hall-level usage without the scores caps his ceiling"},
+  "Quinshon Judkins": {tag:"pass", note:"3.6 YPC as a rookie, coming off a broken leg, into a Watson/Sanders QB mess behind a 27th-ranked line"},
+  "Jacory Croskey-Merritt": {tag:"pass", note:"Robinson traded to SF clears the path, but he's a late-2025 breakout with almost no proven volume history"},
+  "Rachaad White": {tag:"pass", note:"Traded to WAS into a crowded backfield (Croskey-Merritt now the buzz pick) plus a hamstring injury — worse landing spot than TB"},
 
   "Trey McBride": {tag:"avoid", note:"Reach at current price per Joel"},
-  "Tony Pollard": {tag:"avoid"}, "Aaron Jones Sr.": {tag:"avoid", note:"On IR (hamstring), expected out 1+ month; Jordan Mason taking real camp reps ahead of him"},
+  "Tony Pollard": {tag:"avoid", note:"YPRR crashed from 1.86 to 0.86, touches trending down, age 29 in a final contract year on a bottom-5 scoring offense"},
+  "Aaron Jones Sr.": {tag:"avoid", note:"On IR (hamstring), expected out 1+ month; Jordan Mason taking real camp reps ahead of him"},
   "Travis Kelce": {tag:"avoid", note:"Age 37, 3 yrs declining PPG, 28th in TE red-zone share", risk:9},
-  "Courtland Sutton": {tag:"avoid"}, "Khalil Shakir": {tag:"avoid"},
+  "Courtland Sutton": {tag:"avoid", note:"Broncos added Waddle plus Franklin/Mims/Bryant; 12.9 PPG last year would've missed the top 30 in every prior season"},
+  "Khalil Shakir": {tag:"avoid", note:"DJ Moore now in Buffalo caps him near 70/700/5 territory, yet he's still going as a WR4/5"},
 };
 
 const ROUND_PLAN = [
@@ -326,6 +335,7 @@ const state = {
   manualInput: "",
   currentRound: 1,
   yourSlot: 12, // default only; overridden by ?user= + findMySlot() when the URL provides it
+  slotConfirmed: false, // true once findMySlot() succeeds or the user edits "Your slot" themselves; render() shows a warning banner until then, since a wrong slot silently breaks every turn/timing calculation
   teams: 12,
   rounds: 15,
   draftStatus: null, // pre_draft | drafting | complete
@@ -655,6 +665,7 @@ async function findMySlot() {
       state.slotLookupMsg = `Couldn't find ${username} in this draft's order.`;
     } else {
       state.yourSlot = order[user.user_id];
+      state.slotConfirmed = true;
       state.slotLookupMsg = `Found it — you're slot ${state.yourSlot}.`;
     }
   } catch (e) {
@@ -718,8 +729,15 @@ function getRecommendations(available, plan, yourRoster) {
     const flag = FLAGS[name];
     if (flag && flag.tag === "target") {
       score += 10;
-      reasons.push(flag.note ? `Target: ${flag.note}` : "Flagged target");
-      headline = flag.note || "One of the guide's flagged targets this year";
+      if (flag.note) {
+        reasons.push(`Target: ${flag.note}`);
+        headline = flag.note;
+      } else {
+        // No note behind this tag — don't let the generic filler line beat
+        // out a genuinely specific reason from the checks below; it only
+        // gets used as a last resort (see the fallback near the bottom).
+        reasons.push("Flagged target");
+      }
     }
 
     if (planPos && pos === planPos) {
@@ -748,6 +766,7 @@ function getRecommendations(available, plan, yourRoster) {
       if (!headline) headline = "You don't have a TE yet";
     }
 
+    if (!headline && flag && flag.tag === "target") headline = "One of the guide's flagged targets this year";
     if (!headline) headline = "Best player left on the board";
 
     const injury = getInjury(name);
@@ -875,8 +894,8 @@ function render() {
   const bestAvailableHtml = topAvailable.map(([rank, name, pos, tier]) => {
     const flag = FLAGS[name];
     let icon = "";
-    if (flag && flag.tag === "target") icon = `<span class="flag-icon" title="Target">🎯</span>`;
-    if (flag && flag.tag === "avoid") icon = `<span class="flag-icon" title="Avoid">⚠️</span>`;
+    if (flag && flag.tag === "target") icon = `<span class="flag-icon" title="${flag.note ? "Target: " + escapeHtml(flag.note) : "Flagged target"}">🎯</span>`;
+    if (flag && flag.tag === "avoid") icon = `<span class="flag-icon" title="${flag.note ? "Avoid: " + escapeHtml(flag.note) : "Flagged avoid"}">⚠️</span>`;
     const rowInjury = getInjury(name);
     const injuryIcon = rowInjury
       ? `<span class="flag-icon" title="${escapeHtml(rowInjury.status)}${rowInjury.practice ? " — practice: " + escapeHtml(rowInjury.practice) : ""}">🚑 ${escapeHtml(rowInjury.status)}</span>`
@@ -935,6 +954,7 @@ function render() {
 
     <div class="card">
       <div class="label">Your draft settings</div>
+      ${!state.slotConfirmed ? `<p class="error-text" style="margin:0 0 10px;">⚠️ Using default slot ${state.yourSlot} — unconfirmed. Enter your Sleeper username below and hit Find (or edit "Your slot" yourself) before trusting any "picks until your turn" timing.</p>` : ""}
       <div class="row wrap" style="gap:16px;">
         <div class="field-inline">
           <label for="slotInput">Your slot</label>
@@ -1038,6 +1058,7 @@ function wireEvents() {
   const slotInput = byId("slotInput");
   if (slotInput) slotInput.addEventListener("change", e => {
     state.yourSlot = Math.max(1, Math.min(state.teams, Number(e.target.value) || 1));
+    state.slotConfirmed = true; // an explicit manual edit counts as the user confirming it themselves
     render();
   });
   const teamsInput = byId("teamsInput");
