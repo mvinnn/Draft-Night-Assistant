@@ -283,6 +283,21 @@ const FLAGS = {
   "Khalil Shakir": {tag:"avoid", note:"DJ Moore now in Buffalo caps him near 70/700/5 territory, yet he's still going as a WR4/5"},
 };
 
+// FLAGS is keyed by the app's own internal player-name spelling (matches
+// RANKINGS, which every candidatePool/available lookup already goes
+// through — those raw FLAGS[name] lookups are safe as-is). Sleeper's LIVE
+// pick metadata (state.yourRoster, built in fetchPicks) is a different
+// name source and can disagree on punctuation/suffixes (the whole reason
+// normalizeName() exists and is used for every other Sleeper<->internal
+// name comparison in this file). Any FLAGS lookup against a name that
+// came from live Sleeper data — not from RANKINGS — must go through this,
+// not a raw FLAGS[name], or it can silently miss real matches.
+const FLAGS_BY_NORM = {};
+Object.keys(FLAGS).forEach(k => { FLAGS_BY_NORM[normalizeName(k)] = FLAGS[k]; });
+function getFlag(name) {
+  return FLAGS_BY_NORM[normalizeName(name)] || null;
+}
+
 const ROUND_PLAN = [
   {r:1, pos:"RB", note:"Take conviction, not “value” — PPG gap 9-12 vs top-8 is only 0.5 since 2019"},
   {r:2, pos:"RB / BPA", note:"Right after your own pick — full read on who's gone"},
@@ -438,7 +453,7 @@ function detectRuns() {
 function checkRosterWarnings() {
   const warnings = [];
   const highRiskCount = state.yourRoster.filter(p => {
-    const f = FLAGS[p.name];
+    const f = getFlag(p.name);
     return f && typeof f.risk === "number" && f.risk >= 8;
   }).length;
   if (highRiskCount >= 3) {
