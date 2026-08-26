@@ -288,12 +288,12 @@ const ROUND_PLAN = [
   {r:2, pos:"RB / BPA", note:"Right after your own pick — full read on who's gone"},
   {r:3, pos:"WR", note:"Long wait since 2.13 — re-check the board fresh"},
   {r:4, pos:"BPA", note:"Back-to-back with Rd 3 — you likely get both again"},
-  {r:5, pos:"WR", note:"Waddle/Flowers/McMillan/Egbuka tier"},
+  {r:5, pos:"WR", note:"Real WR2-or-better depth tier here — don't reach above it, several legit options remain"},
   {r:6, pos:"BPA", note:"Steepest talent drop-off remaining"},
   {r:7, pos:"BPA", note:"Steepest talent drop-off remaining"},
   {r:8, pos:"QB", note:"Target ADP QB7-11 — going later than usual this year"},
   {r:9, pos:"Upside WR", note:"Rookie WRs, situational winners"},
-  {r:10, pos:"TE (value)", note:"Best value TE if you punted — Kincaid/Goedert/Fannin tier"},
+  {r:10, pos:"TE (value)", note:"Best value TE tier if you punted the position early — a real streaming-proof starter still sits here"},
   {r:11, pos:"Handcuff", note:"Handcuff your own Rd 1-2 RB if startable"},
   {r:12, pos:"QB (upside)", note:"Rushing QBs hit 63% vs 31% for pocket passers at this tier"},
   {r:13, pos:"Deep sleeper", note:"Your call — check flagged targets still on board"},
@@ -771,19 +771,32 @@ function getRecommendations(available, plan, yourRoster) {
       }
     }
 
-    if (planPos && pos === planPos) {
-      score += 15;
-      reasons.push(`Round ${plan.r} plan calls for ${planPos}`);
-      if (!headline) headline = "Good value at this point in the draft";
-    }
-
     // Scarcity is about the whole board, not just the recommendable pool —
-    // count against `available`, not `candidatePool`.
+    // count against `available`, not `candidatePool`. Checked before the
+    // round-plan note below: this is genuinely unique to whichever single
+    // player is last in their tier, where a round-plan note is the same
+    // canned line for every candidate at that position — the more
+    // specific, player-true reason should win the headline first.
     const tierMatesLeft = available.filter(([, n, p, t]) => p === pos && t === tier).length;
     if (tierMatesLeft === 1) {
       score += 8;
       reasons.push(`Last ${pos} in tier ${tier} — next tier is a real drop-off`);
       if (!headline) headline = `Last good ${pos} before the next tier drops off`;
+    }
+
+    if (planPos && pos === planPos) {
+      score += 15;
+      reasons.push(`Round ${plan.r} plan calls for ${planPos}`);
+      // The round plan's own note is real strategic reasoning (e.g. round
+      // 1's is literally an argument against chasing "value"), so it's a
+      // better fallback than a canned filler line — but it's still a
+      // ROUND-level note, identical for every candidate at that position,
+      // not proof this specific player is the one to take. Only plan notes
+      // that don't name specific other players belong here (see ROUND_PLAN
+      // above — round 5/10 notes were rewritten for exactly this reason
+      // after two different WRs both got shown a note naming four
+      // completely different receivers).
+      if (!headline) headline = plan.note || `Round ${plan.r} calls for ${planPos} here`;
     }
 
     if (pos === "QB" && state.currentRound >= 6 && !posCounts.QB) {
