@@ -5,59 +5,39 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Bozo Club Draft Assistant</title>
 <style>
+  /* Warm, cozy visual theme -- built for one person (Morgan) to feel
+     comfortable staring at this for a few hours on draft night, not for
+     a dashboard-power-user vibe. One deliberate palette, no dark-mode
+     branch -- a muted "warm light" look was the whole point, so a system
+     dark-mode override would fight that rather than complement it. */
   :root {
-    --bg: #f5f6f8;
-    --surface-1: #ffffff;
-    --surface-2: #eef0f3;
-    --border: #dde1e6;
-    --text: #1a1d21;
-    --text-secondary: #5b6270;
-    --text-muted: #8a919e;
-    --radius: 10px;
+    --bg: #faf3e8;
+    --surface-1: #fffdf9;
+    --surface-2: #f2e8d8;
+    --border: #e9dcc3;
+    --text: #3a2f24;
+    --text-secondary: #6e5d4a;
+    --text-muted: #9c8c76;
+    --radius: 16px;
+    --radius-sm: 12px;
     --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --shadow: 0 1px 2px rgba(58,47,36,0.05), 0 6px 18px rgba(58,47,36,0.07);
 
-    --accent: #3b6fe0;
-    --bg-accent: #e8eefc;
-    --text-accent: #3b6fe0;
+    --accent: #c1633f;
+    --bg-accent: #f5e0cd;
+    --text-accent: #a24f2c;
 
-    --success: #1c8a4b;
-    --bg-success: #e5f6ec;
-    --text-success: #1c8a4b;
+    --success: #6e8f57;
+    --bg-success: #e7eedd;
+    --text-success: #4f6c3e;
 
-    --warning: #b06a00;
-    --bg-warning: #fdf1de;
-    --text-warning: #b06a00;
+    --warning: #be8a2e;
+    --bg-warning: #f5e8ca;
+    --text-warning: #8f651b;
 
-    --danger: #c8372f;
-    --bg-danger: #fbe9e8;
-    --text-danger: #c8372f;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --bg: #14161a;
-      --surface-1: #1c1f24;
-      --surface-2: #24272d;
-      --border: #32363d;
-      --text: #eceef1;
-      --text-secondary: #a6acb8;
-      --text-muted: #767c88;
-
-      --accent: #6d93ee;
-      --bg-accent: #22304f;
-      --text-accent: #8fb0f5;
-
-      --success: #3fbd77;
-      --bg-success: #163524;
-      --text-success: #5fd394;
-
-      --warning: #e0a53d;
-      --bg-warning: #3a2c10;
-      --text-warning: #f0bb5e;
-
-      --danger: #e46861;
-      --bg-danger: #3a1917;
-      --text-danger: #f0847d;
-    }
+    --danger: #bd5a44;
+    --bg-danger: #f5ded2;
+    --text-danger: #99432c;
   }
 
   * { box-sizing: border-box; }
@@ -65,63 +45,67 @@
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-family: ui-rounded, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
   #app {
-    max-width: 760px;
+    max-width: 860px;
     margin: 0 auto;
-    padding: 1.5rem 1rem 4rem;
+    padding: 2.5rem 1.5rem 4rem;
   }
-  h1 { font-size: 20px; font-weight: 600; margin: 0 0 2px; }
-  h2 { font-size: 15px; font-weight: 600; margin: 0 0 10px; }
-  .subtitle { color: var(--text-secondary); font-size: 13px; margin: 0 0 1.5rem; }
+  h1 { font-size: 26px; font-weight: 700; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 15px; font-weight: 700; margin: 0 0 12px; color: var(--text-secondary); }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0 0 1.75rem; }
 
   .card {
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 1rem;
-    margin-bottom: 1.25rem;
+    box-shadow: var(--shadow);
+    padding: 1.35rem;
+    margin-bottom: 1.5rem;
   }
   .card-flat {
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    padding: 1rem;
-    margin-bottom: 1.25rem;
+    padding: 1.1rem 1.25rem;
+    margin-bottom: 1.5rem;
   }
   .label {
-    font-size: 12px;
-    font-weight: 600;
+    font-size: 11.5px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: var(--text-secondary);
-    margin-bottom: 8px;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    margin-bottom: 10px;
   }
 
   input[type=text], input[type=number] {
     background: var(--surface-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-sm);
     color: var(--text);
-    padding: 8px 10px;
-    font-size: 13px;
+    padding: 9px 12px;
+    font-size: 13.5px;
     font-family: inherit;
   }
   input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 
   button {
     background: var(--accent);
-    color: white;
+    color: #fffaf5;
     border: none;
-    border-radius: 8px;
-    padding: 8px 14px;
-    font-size: 13px;
-    font-weight: 500;
+    border-radius: var(--radius-sm);
+    padding: 9px 16px;
+    font-size: 13.5px;
+    font-weight: 600;
     cursor: pointer;
     font-family: inherit;
     white-space: nowrap;
+    transition: filter 0.12s ease, transform 0.05s ease;
   }
-  button:hover { filter: brightness(1.08); }
+  button:hover { filter: brightness(1.06); }
+  button:active { transform: translateY(1px); }
   button.secondary {
     background: var(--surface-2);
     color: var(--text);
@@ -138,31 +122,32 @@
   .row.wrap { flex-wrap: wrap; }
   .grow { flex: 1; }
 
-  .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-bottom: 1.25rem; }
-  .stat { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; }
+  .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; margin-bottom: 1.5rem; }
+  .stat { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 14px 16px; }
   .stat .label { margin-bottom: 4px; }
-  .stat .value { font-size: 22px; font-weight: 600; }
+  .stat .value { font-size: 23px; font-weight: 700; color: var(--text-accent); }
 
   .pill {
-    font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px;
+    font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 999px;
     background: var(--bg-accent); color: var(--text-accent); display: inline-block;
   }
 
   .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); display: inline-block; }
 
   .chip {
-    font-size: 12.5px; padding: 4px 10px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px;
+    font-size: 12.5px; padding: 5px 12px; border-radius: 999px; display: inline-flex; align-items: center; gap: 5px;
   }
   .chip.target { background: var(--bg-success); color: var(--text-success); }
   .chip.avoid { background: var(--bg-danger); color: var(--text-danger); }
 
   .player-row {
     display: flex; align-items: center; gap: 10px;
-    padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px;
+    padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 7px;
+    background: var(--surface-1);
   }
   .player-row .rank { font-size: 12px; color: var(--text-muted); width: 26px; }
   .pos-badge {
-    font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px;
+    font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 7px;
     width: 28px; text-align: center; flex-shrink: 0;
   }
   .pos-QB { background: var(--bg-accent); color: var(--text-accent); }
@@ -170,12 +155,12 @@
   .pos-WR { background: var(--bg-warning); color: var(--text-warning); }
   .pos-TE { background: var(--bg-danger); color: var(--text-danger); }
   .player-name { font-size: 13.5px; flex: 1; }
-  .player-row button { font-size: 11.5px; padding: 4px 9px; }
+  .player-row button { font-size: 11.5px; padding: 5px 10px; }
   .flag-icon { font-size: 13px; }
 
-  .muted-note { font-size: 12px; color: var(--text-muted); margin: 8px 0 0; }
-  .error-text { font-size: 13px; color: var(--text-danger); margin: 8px 0 0; }
-  .status-text { font-size: 13px; color: var(--text-muted); margin: 8px 0 0; }
+  .muted-note { font-size: 12px; color: var(--text-muted); margin: 10px 0 0; }
+  .error-text { font-size: 13px; color: var(--text-danger); margin: 10px 0 0; }
+  .status-text { font-size: 13px; color: var(--text-muted); margin: 10px 0 0; }
 
   .field-inline { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); }
   .field-inline input { width: 56px; }
@@ -184,8 +169,7 @@
   code { font-family: var(--font-mono); background: var(--surface-2); padding: 1px 4px; border-radius: 4px; }
 
   #best-available-list { display: flex; flex-direction: column; }
-</style>
-</head>
+</style></head>
 <body>
 <div id="app"></div>
 
@@ -956,8 +940,9 @@ function render() {
       <div class="row" style="align-items:flex-start; gap:14px;">
         ${posBadge(recommendations[0].pos)}
         <div class="grow">
-          <div style="font-size:19px; font-weight:600;">Pick ${escapeHtml(recommendations[0].name)}</div>
-          <p style="margin:6px 0 0; font-size:14px; color: var(--text-secondary);">${escapeHtml(recommendations[0].headline)}</p>
+          <div style="font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:0.04em; color: var(--text-secondary); margin-bottom:3px;">Your pick</div>
+          <div style="font-size:26px; font-weight:700; color: var(--text-accent); letter-spacing:-0.01em;">${escapeHtml(recommendations[0].name)}</div>
+          <p style="margin:8px 0 0; font-size:14.5px; color: var(--text-secondary); line-height:1.4;">${escapeHtml(recommendations[0].headline)}</p>
         </div>
         <button class="secondary" data-drafted-name="${escapeHtml(recommendations[0].name)}">Already drafted<br>(fix tracking)</button>
       </div>
@@ -1063,9 +1048,9 @@ function render() {
       <div class="stat"><div class="label">Drafted so far</div><div class="value">${state.draftedNames.size}</div></div>
     </div>
 
-    <div class="card" style="border-color: var(--accent);">
+    <div class="card" style="${isYourTurn ? "background: var(--bg-accent); border-color: var(--accent);" : ""}">
       <div class="row" style="margin-bottom:10px;">
-        <span style="font-size:15px; font-weight:600;">${isYourTurn ? "🎯 It's your turn" : `⏳ Not your turn yet — ${picksUntilYourTurn} pick${picksUntilYourTurn === 1 ? "" : "s"} away`}</span>
+        <span style="font-size:15px; font-weight:700; color: ${isYourTurn ? "var(--text-accent)" : "var(--text)"};">${isYourTurn ? "🎯 It's your turn" : `⏳ Not your turn yet — ${picksUntilYourTurn} pick${picksUntilYourTurn === 1 ? "" : "s"} away`}</span>
       </div>
       ${recommendationHtml}
     </div>
