@@ -339,6 +339,9 @@ const state = {
   alerts: [], // {id, type: "tier-break"|"run"|"roster", text, pickNo}, newest first
   _slotToRosterId: null,
   _lastRunAlertKey: null,
+  injuryData: new Map(), // normalizedName -> {status, startDate, practice}; only players with a real injury_status, from Sleeper's player DB (see fetchInjuryData)
+  injuryFetchStatus: "idle", // idle | loading | ok | error
+  injuryFetchedAt: null, // Date.now() of the last successful injury sync
 };
 
 function pickNoForRound(round, slot, teams) {
@@ -361,6 +364,17 @@ function normalizeName(name) {
     .replace(/[.']/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+// Injury designations severe enough to functionally rule a player out —
+// hard-excluded from getRecommendations() below, the same way "avoid"/
+// "pass" flags are, since headlining someone reported Out to a user with
+// no football context to catch it is worse than a stale guide note.
+// "Questionable" stays recommendable but gets a caution appended.
+const SEVERE_INJURY_STATUSES = new Set(["Out", "Doubtful", "IR", "PUP", "NA", "Suspended"]);
+
+function getInjury(name) {
+  return state.injuryData.get(normalizeName(name)) || null;
 }
 
 function pushAlert(type, text) {
@@ -499,6 +513,41 @@ async function fetchPicks(id) {
   render();
 }
 
+// Sleeper's player database (distinct from the draft-specific endpoints
+// above) carries real injury designations — injury_status/injury_start_date/
+// practice_participation — sourced from the same feed Sleeper's own app
+// uses, not from the static guide. Sleeper asks callers to hit this at
+// most once a day (it's a multi-MB dump of every player), so this only
+// runs once per connect or on manual refresh — never on the 8s pick-poll
+// loop. Only players with a real injury_status are kept in memory;
+// everyone else is dropped immediately.
+async function fetchInjuryData() {
+  state.injuryFetchStatus = "loading";
+  render();
+  try {
+    const res = await fetch("https://api.sleeper.app/v1/players/nfl?active=true");
+    if (!res.ok) throw new Error("unavailable");
+    const players = await res.json();
+    const injuries = new Map();
+    Object.values(players).forEach(p => {
+      if (!p || !p.injury_status || !p.full_name) return;
+      injuries.set(normalizeName(p.full_name), {
+        status: p.injury_status,
+        startDate: p.injury_start_date || null,
+        practice: p.practice_participation || null,
+      });
+    });
+    state.injuryData = injuries;
+    state.injuryFetchStatus = "ok";
+    state.injuryFetchedAt = Date.now();
+  } catch (e) {
+    // Non-fatal — the app is fully usable on the static guide notes alone,
+    // same as if this fetch had never been added.
+    state.injuryFetchStatus = "error";
+  }
+  render();
+}
+
 // Sleeper's public API sits behind a CDN edge cache whose s-maxage for a
 // live draft's /picks response is 30s (confirmed via response headers) —
 // well above this 8s interval. Polling faster than that doesn't get
@@ -529,6 +578,7 @@ function connect() {
   state.draftId = id;
   fetchPicks(id);
   startPolling(id);
+  if (state.injuryFetchStatus === "idle") fetchInjuryData();
 }
 
 // Reads ?draft=<id or url>&user=<sleeper_username> from the page's own
@@ -545,6 +595,7 @@ async function initFromUrlParams() {
   state.draftId = id;
   await fetchPicks(id);
   startPolling(id);
+  if (state.injuryFetchStatus === "idle") fetchInjuryData();
 
   const userParam = params.get("user");
   if (userParam) {
@@ -653,7 +704,10 @@ function getRecommendations(available, plan, yourRoster) {
   // ⚠️/🎯 icons; this pool is only for what gets actively recommended.
   const candidatePool = available.filter(([, name]) => {
     const tag = FLAGS[name] && FLAGS[name].tag;
-    return tag !== "avoid" && tag !== "pass";
+    if (tag === "avoid" || tag === "pass") return false;
+    const injury = getInjury(name);
+    if (injury && SEVERE_INJURY_STATUSES.has(injury.status)) return false;
+    return true;
   });
 
   const scored = candidatePool.slice(0, 40).map(([rank, name, pos, tier]) => {
@@ -696,6 +750,12 @@ function getRecommendations(available, plan, yourRoster) {
 
     if (!headline) headline = "Best player left on the board";
 
+    const injury = getInjury(name);
+    if (injury && injury.status === "Questionable") {
+      reasons.push(`Injury watch: Questionable${injury.practice ? ` (practice: ${injury.practice})` : ""}`);
+      headline = `${headline} — currently Questionable, worth a last check before your pick`;
+    }
+
     return {rank, name, pos, tier, score, reasons, headline};
   });
 
@@ -717,6 +777,11 @@ function render() {
   const avoidStillUp = available.filter(([, name]) => FLAGS[name] && FLAGS[name].tag === "avoid").slice(0, 5);
 
   const posBadge = pos => `<span class="pos-badge pos-${pos}">${pos}</span>`;
+
+  const injuryStatusText = state.injuryFetchStatus === "loading" ? "syncing…"
+    : state.injuryFetchStatus === "error" ? "unavailable right now — using guide notes only"
+    : state.injuryFetchedAt ? `synced ${Math.max(0, Math.round((Date.now() - state.injuryFetchedAt) / 60000))}m ago via Sleeper`
+    : "not synced yet";
 
   const connectionPanel = state.liveStatus !== "live" ? `
     <div class="row">
@@ -751,12 +816,29 @@ function render() {
   ` : "";
 
   const avoidHtml = avoidStillUp.length > 0 ? `
-    <div>
+    <div style="margin-bottom:12px;">
       <div class="label" style="color: var(--text-danger); text-transform:none; font-weight:600;">⚠️ Flagged fades still available</div>
       <div class="row wrap">
         ${avoidStillUp.map(([, name, pos]) => `
           <span class="chip avoid" title="${escapeHtml((FLAGS[name] && FLAGS[name].note) || "")}">${escapeHtml(name)} <span style="opacity:0.7;">(${pos})</span></span>
         `).join("")}
+      </div>
+    </div>
+  ` : "";
+
+  // Live from Sleeper's player data (fetchInjuryData), not the static guide
+  // — anyone currently carrying a real injury designation who's still on
+  // the board, so it's visible *why* a highly-ranked name isn't showing up
+  // as a recommendation instead of it just silently vanishing.
+  const injuredStillUp = available.filter(([, name]) => getInjury(name)).slice(0, 8);
+  const injuryHtml = injuredStillUp.length > 0 ? `
+    <div>
+      <div class="label" style="color: var(--text-warning); text-transform:none; font-weight:600;">🚑 Injury watch (still on the board)</div>
+      <div class="row wrap">
+        ${injuredStillUp.map(([, name, pos]) => {
+          const inj = getInjury(name);
+          return `<span class="chip" style="background:var(--bg-warning); color:var(--text-warning);" title="${escapeHtml(inj.practice ? "Practice: " + inj.practice : "")}">${escapeHtml(name)} — ${escapeHtml(inj.status)} <span style="opacity:0.7;">(${pos})</span></span>`;
+        }).join("")}
       </div>
     </div>
   ` : "";
@@ -795,6 +877,10 @@ function render() {
     let icon = "";
     if (flag && flag.tag === "target") icon = `<span class="flag-icon" title="Target">🎯</span>`;
     if (flag && flag.tag === "avoid") icon = `<span class="flag-icon" title="Avoid">⚠️</span>`;
+    const rowInjury = getInjury(name);
+    const injuryIcon = rowInjury
+      ? `<span class="flag-icon" title="${escapeHtml(rowInjury.status)}${rowInjury.practice ? " — practice: " + escapeHtml(rowInjury.practice) : ""}">🚑 ${escapeHtml(rowInjury.status)}</span>`
+      : "";
     return `
       <div class="player-row">
         <span class="rank">${rank}</span>
@@ -802,6 +888,7 @@ function render() {
         <span class="player-name">${escapeHtml(name)}</span>
         <span class="pill" style="font-weight:500;" title="Tier ${tier} at ${pos}">T${tier}</span>
         ${icon}
+        ${injuryIcon}
         <button class="secondary" data-drafted-name="${escapeHtml(name)}" title="This only fixes this app's tracking — it does not submit a real pick in Sleeper">Already drafted</button>
       </div>
     `;
@@ -840,6 +927,10 @@ function render() {
       ${connectionPanel}
       ${errorBlock}
       <p class="muted-note">Paste the full draft URL or just the draft_id. Auto-refreshes every 8s while live — Sleeper's own API can still lag ~30s behind the draft room (their public endpoint is CDN-cached), so use "Refresh now" or manual entry right before your pick.</p>
+      <p class="muted-note">
+        🚑 Injury data: ${injuryStatusText}
+        <button id="refreshInjuryBtn" class="secondary" style="margin-left:6px; padding:2px 8px; font-size:11px;">Refresh</button>
+      </p>
     </div>
 
     <div class="card">
@@ -887,7 +978,7 @@ function render() {
       ${plan.note ? `<p style="font-size:14px; color: var(--text-secondary); margin:0;">${escapeHtml(plan.note)}</p>` : ""}
     </div>
 
-    ${(targetsStillUp.length > 0 || avoidStillUp.length > 0) ? `<div style="margin-bottom:1.25rem;">${targetsHtml}${avoidHtml}</div>` : ""}
+    ${(targetsStillUp.length > 0 || avoidStillUp.length > 0 || injuredStillUp.length > 0) ? `<div style="margin-bottom:1.25rem;">${targetsHtml}${avoidHtml}${injuryHtml}</div>` : ""}
 
     <div style="margin-bottom:1.25rem;">
       <h2>Best available</h2>
@@ -939,6 +1030,8 @@ function wireEvents() {
 
   const refreshBtn = byId("refreshBtn");
   if (refreshBtn) refreshBtn.addEventListener("click", () => fetchPicks(state.draftId));
+  const refreshInjuryBtn = byId("refreshInjuryBtn");
+  if (refreshInjuryBtn) refreshInjuryBtn.addEventListener("click", fetchInjuryData);
   const disconnectBtn = byId("disconnectBtn");
   if (disconnectBtn) disconnectBtn.addEventListener("click", disconnect);
 
