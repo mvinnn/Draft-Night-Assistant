@@ -452,6 +452,12 @@ function checkRosterWarnings() {
   if (state.currentRound >= 10 && !posCounts["TE"]) {
     warnings.push("No TE rostered yet and it's Round 10+ — check the value tier before it's gone.");
   }
+  if (posCounts["TE"] >= 2) {
+    warnings.push(`You've drafted ${posCounts["TE"]} TEs — with only 1 starting TE spot, that bench value might've gone further at RB/WR.`);
+  }
+  if (posCounts["QB"] >= 3) {
+    warnings.push(`You've drafted ${posCounts["QB"]} QBs — a 3rd rarely sees the field; that pick might be better used on RB/WR depth.`);
+  }
   return warnings;
 }
 
@@ -700,6 +706,31 @@ function getPlanPosition(planPos) {
   return null;
 }
 
+// Diminishing marginal value: recommending more of a position than a
+// realistic roster shape calls for competes for scarce picks against
+// positions you might still be missing outright. TE has exactly one
+// starting slot and thin bench value beyond it, so a 2nd one gets
+// penalized starting immediately. QB isn't penalized until a 3rd — the
+// round-by-round plan (see ROUND_PLAN, round 12) deliberately calls for
+// exactly two QBs, a speculative rushing-upside QB2, so that shouldn't
+// get fought by this. RB/WR soak up real bench/flex/handcuff value well
+// past their own starter count, so they're barely penalized until well
+// past a normal roster shape.
+const POSITION_SATURATION = {
+  QB: { softCap: 2, penaltyPerOver: 30 },
+  TE: { softCap: 1, penaltyPerOver: 22 },
+  RB: { softCap: 5, penaltyPerOver: 8 },
+  WR: { softCap: 5, penaltyPerOver: 8 },
+};
+
+function saturationPenalty(pos, posCounts) {
+  const rule = POSITION_SATURATION[pos];
+  if (!rule) return 0;
+  const have = posCounts[pos] || 0;
+  const over = have - rule.softCap + 1;
+  return over > 0 ? over * rule.penaltyPerOver : 0;
+}
+
 // Synthesizes tier state + run/flag data + the round-by-round plan +
 // roster need into a ranked shortlist — the actual "what should I do
 // right now" answer, not just the raw ingredients for one.
@@ -768,6 +799,14 @@ function getRecommendations(available, plan, yourRoster) {
 
     if (!headline && flag && flag.tag === "target") headline = "One of the guide's flagged targets this year";
     if (!headline) headline = "Best player left on the board";
+
+    const satPenalty = saturationPenalty(pos, posCounts);
+    if (satPenalty > 0) {
+      score -= satPenalty;
+      const have = posCounts[pos];
+      reasons.push(`Already have ${have} ${pos}${have === 1 ? "" : "s"} rostered — likely more value elsewhere right now`);
+      headline = `${headline} — you already have ${have} ${pos}${have === 1 ? "" : "s"}, worth weighing against other needs first`;
+    }
 
     const injury = getInjury(name);
     if (injury && injury.status === "Questionable") {
