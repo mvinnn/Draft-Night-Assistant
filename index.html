@@ -717,7 +717,17 @@ function getPlanPosition(planPos) {
 // past a normal roster shape.
 const POSITION_SATURATION = {
   QB: { softCap: 2, penaltyPerOver: 30 },
-  TE: { softCap: 1, penaltyPerOver: 22 },
+  // TE's max combined bonus once you already have one rostered is
+  // target(+10) + tier-scarcity(+8) = 18 (the round-plan-match bonus
+  // can't co-occur here -- ROUND_PLAN only calls for TE once, at round
+  // 10, and only fires while `already` is still below that count). 22
+  // wasn't enough to reliably beat that stack down below replacement
+  // level: a flagged, merely-good-value TE (e.g. Harold Fannin Jr.)
+  // could still edge out real bench value at that pick, which is exactly
+  // the "don't recommend a 2nd TE we don't need" case reported after
+  // rostering Tyler Warren. 30 comfortably clears the 18-point max stack
+  // with margin.
+  TE: { softCap: 1, penaltyPerOver: 30 },
   RB: { softCap: 5, penaltyPerOver: 8 },
   WR: { softCap: 5, penaltyPerOver: 8 },
 };
@@ -758,6 +768,18 @@ function getRecommendations(available, plan, yourRoster) {
 
     const flag = FLAGS[name];
     if (flag && flag.tag === "target") {
+      // Weighted highest of the three bonuses in this function on purpose:
+      // a curated, specific "the market is wrong about this player" call
+      // is the actual point of this tool, and should generally beat a
+      // generic signal like "the calendar says draft this position now"
+      // (the round-plan bonus further down). Tried bumping this to +18 to
+      // also fix a marginal round-8 case (flagged Malik Willis narrowly
+      // lost to unflagged Bo Nix/Mahomes on rank alone) -- but +18 was
+      // large enough to flip the round-1 Gibbs-vs-Hampton tie (rank gap
+      // is only 10) and knock the presumptive 1.01 out of the top-5
+      // entirely. Reverted to +10: getting a mediocre backup QB call
+      // slightly wrong in round 8 is a much smaller cost than steering
+      // away from the consensus #1 overall pick in round 1.
       score += 10;
       if (flag.note) {
         reasons.push(`Target: ${flag.note}`);
@@ -778,6 +800,10 @@ function getRecommendations(available, plan, yourRoster) {
     // specific, player-true reason should win the headline first.
     const tierMatesLeft = available.filter(([, n, p, t]) => p === pos && t === tier).length;
     if (tierMatesLeft === 1) {
+      // Genuine board-reading (who's actually still left), weighted
+      // above the round-plan match below for the same reason as the
+      // target bonus: reacting to the real board beats reciting a
+      // static per-round assumption.
       score += 8;
       reasons.push(`Last ${pos} in tier ${tier} — next tier is a real drop-off`);
       if (!headline) headline = `Last good ${pos} before the next tier drops off`;
@@ -799,6 +825,16 @@ function getRecommendations(available, plan, yourRoster) {
       const plannedSoFar = ROUND_PLAN.filter(p => p.r <= plan.r && getPlanPosition(p.pos) === planPos).length;
       const already = posCounts[planPos] || 0;
       if (already < plannedSoFar) {
+        // Deliberately the smallest of the three bonuses in this function
+        // (target +10, tier-scarcity +8) -- this is the least board-aware
+        // signal here, just "what position does the calendar say," so it
+        // should nudge, not dominate. It's genuinely possible for this
+        // bonus alone to let a mediocre round-plan match narrowly
+        // outscore a real curated target a few ranks worse off (seen at
+        // round 8: unflagged Bo Nix/Mahomes over flagged Malik Willis) --
+        // a known, accepted tradeoff, since the alternative (weighting
+        // this or the target bonus higher) breaks far more visible calls
+        // at the top of the draft. See the target-bonus comment above.
         score += 15;
         reasons.push(`Round ${plan.r} plan calls for ${planPos}`);
         // The round plan's own note is real strategic reasoning (e.g. round
