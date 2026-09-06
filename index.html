@@ -697,6 +697,17 @@ function computeYourNextPickNo(nextOverallPickNo, slot, teams) {
 // used throughout RANKINGS ("QB"/"RB"/"WR"/"TE"), or null when the plan is
 // BPA / not tied to a single position (e.g. "Deep sleeper", "DST").
 function getPlanPosition(planPos) {
+  // "BPA" anywhere in the label (e.g. round 2's "RB / BPA") means the
+  // plan is deliberately NOT calling for a specific position that round --
+  // it is genuinely "best player available," with any named position just
+  // a loose nudge, not a bonus-worthy match. Checked first so it overrides
+  // the keyword checks below: without this, "RB / BPA" matched /RB/ and
+  // handed every RB a flat scoring bonus regardless of quality, which is
+  // exactly what let mediocre RBs (Jeremiyah Love, Breece Hall, Javonte
+  // Williams) outscore a clearly-better WR (Nico Collins) at the 2.12 turn
+  // in a real mock draft -- the round-plan bonus was never supposed to
+  // apply that round at all.
+  if (/BPA/.test(planPos)) return null;
   if (/QB/.test(planPos)) return "QB";
   if (/Handcuff/i.test(planPos)) return "RB";
   if (/RB/.test(planPos)) return "RB";
